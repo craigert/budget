@@ -197,7 +197,7 @@
 						No accounts yet. Add one on the Accounts page first.
 					</p>
 				{:else}
-					<div class="max-h-44 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-1 dark:border-slate-700">
+					<div class="space-y-1 rounded-md border border-slate-200 p-1 dark:border-slate-700">
 						{#each accounts.value as a (a.id)}
 							<label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
 								<input
@@ -251,7 +251,7 @@
 				</div>
 			</div>
 			<input type="search" bind:value={iconQuery} placeholder="Search icons…" class="mb-2 w-full" />
-			<div class="max-h-48 space-y-2 overflow-y-auto pr-1">
+			<div class="space-y-2">
 				{#each filteredGroups as g (g.label)}
 					<div>
 						<div class="section-label mb-1">{g.label}</div>

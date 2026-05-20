@@ -96,7 +96,7 @@
 				placeholder="Search icons…"
 				class="mb-3 w-full"
 			/>
-			<div class="max-h-60 space-y-3 overflow-y-auto pr-1">
+			<div class="space-y-3">
 				{#each filteredGroups as g (g.label)}
 					<div>
 						<div class="section-label mb-1.5">{g.label}</div>
