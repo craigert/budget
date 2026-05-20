@@ -1,0 +1,43 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	--color-brand-50: #f0f9ff;
+	--color-brand-100: #e0f2fe;
+	--color-brand-500: #0ea5e9;
+	--color-brand-600: #0284c7;
+	--color-brand-700: #0369a1;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	@apply bg-slate-50 text-slate-900 antialiased;
+	@apply dark:bg-slate-950 dark:text-slate-100;
+}
+
+/* Form polish */
+input[type='text'],
+input[type='number'],
+input[type='date'],
+input[type='search'],
+input[type='email'],
+select,
+textarea {
+	@apply rounded-md border-slate-300 bg-white shadow-sm focus:border-brand-500 focus:ring-brand-500;
+	@apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+}
+
+button {
+	@apply cursor-pointer;
+}
+
+/* No-tap-highlight on mobile */
+* {
+	-webkit-tap-highlight-color: transparent;
+}
