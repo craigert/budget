@@ -16,9 +16,9 @@
 	}
 	let { slices, total, centerLabel, centerValue }: Props = $props();
 
-	const size = 220;
-	const r = 90;
-	const stroke = 28;
+	const size = 240;
+	const r = 100;
+	const stroke = 32;
 	const c = 2 * Math.PI * r;
 
 	const sum = $derived(total ?? slices.reduce((s, x) => s + x.value, 0));
@@ -50,10 +50,10 @@
 	});
 </script>
 
-<div class="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+<div class="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-6">
 	<svg
 		viewBox="0 0 {size} {size}"
-		class="block h-44 w-44 shrink-0 -rotate-90"
+		class="block h-60 w-60 shrink-0 -rotate-90 sm:h-64 sm:w-64"
 		role="img"
 		aria-label="Donut chart"
 	>
@@ -118,7 +118,7 @@
 		</g>
 	</svg>
 
-	<ul class="flex-1 space-y-1.5 text-sm">
+	<ul class="flex-1 space-y-1.5 self-stretch text-sm sm:py-2">
 		{#if segments.length === 0}
 			<li class="text-slate-500">No data yet.</li>
 		{/if}
@@ -131,8 +131,8 @@
 				{#if seg.icon}
 					<span style="color:{seg.color}"><Icon name={seg.icon} size={14} /></span>
 				{/if}
-				<span class="flex-1 truncate">{seg.label}</span>
-				<span class="text-xs tabular-nums text-slate-500">{seg.pct.toFixed(0)}%</span>
+				<span class="truncate">{seg.label}</span>
+				<span class="text-xs font-medium tabular-nums text-slate-500">{seg.pct.toFixed(0)}%</span>
 			</li>
 		{/each}
 	</ul>

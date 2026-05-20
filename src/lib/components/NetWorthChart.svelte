@@ -10,13 +10,15 @@
 
 	let { points, anchorAtZero = false }: Props = $props();
 
-	// Viewport (rendered via viewBox so it scales to the container)
-	const W = 880;
-	const H = 280;
-	const padL = 64;
-	const padR = 24;
-	const padT = 20;
-	const padB = 32;
+	// Viewport (rendered via viewBox so it scales to the container).
+	// 16:5 aspect — wider than 16:9 to give horizontal room for daily detail
+	// without making the chart too tall on desktop.
+	const W = 1600;
+	const H = 500;
+	const padL = 110;
+	const padR = 40;
+	const padT = 32;
+	const padB = 56;
 	const innerW = W - padL - padR;
 	const innerH = H - padT - padB;
 
@@ -222,10 +224,11 @@
 		<svg
 			bind:this={svgEl}
 			viewBox="0 0 {W} {H}"
-			class="block h-64 w-full select-none touch-none"
+			class="block w-full select-none touch-none"
+			style="aspect-ratio: {W} / {H};"
 			role="img"
 			aria-label="Net worth over the year"
-			preserveAspectRatio="none"
+			preserveAspectRatio="xMidYMid meet"
 			onpointermove={onPointerMove}
 			onpointerleave={onPointerLeave}
 		>
@@ -246,15 +249,15 @@
 					y2={t.y}
 					stroke="currentColor"
 					class="text-slate-100 dark:text-slate-800/60"
-					stroke-width="1"
+					stroke-width="1.5"
 				/>
 				<text
-					x={padL - 10}
+					x={padL - 16}
 					y={t.y}
 					text-anchor="end"
 					dominant-baseline="middle"
 					class="fill-slate-400 dark:fill-slate-500"
-					font-size="11"
+					font-size="20"
 					font-weight="500"
 				>
 					{money(t.value)}
@@ -262,19 +265,17 @@
 			{/each}
 
 			<!-- X-axis month labels -->
-			{#each monthTicks as tk, i (tk.label)}
-				{#if i % 1 === 0}
-					<text
-						x={tk.x}
-						y={H - 10}
-						text-anchor="middle"
-						class="fill-slate-400 dark:fill-slate-500"
-						font-size="11"
-						font-weight="500"
-					>
-						{tk.label}
-					</text>
-				{/if}
+			{#each monthTicks as tk (tk.label)}
+				<text
+					x={tk.x}
+					y={H - 16}
+					text-anchor="middle"
+					class="fill-slate-400 dark:fill-slate-500"
+					font-size="20"
+					font-weight="500"
+				>
+					{tk.label}
+				</text>
 			{/each}
 
 			<!-- Area fill -->
@@ -291,9 +292,10 @@
 				fill="none"
 				stroke="currentColor"
 				class="text-brand-500"
-				stroke-width="2.5"
+				stroke-width="4"
 				stroke-linecap="round"
 				stroke-linejoin="round"
+				vector-effect="non-scaling-stroke"
 				style="stroke-dasharray: {pathLength || 0}; stroke-dashoffset: {mounted ? 0 : pathLength || 0}; transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1);"
 			/>
 
@@ -302,11 +304,11 @@
 				<circle
 					cx={x(points.length - 1)}
 					cy={y(latest)}
-					r="5"
+					r="9"
 					fill="white"
 					stroke="currentColor"
 					class="text-brand-500"
-					stroke-width="2.5"
+					stroke-width="4"
 					style="opacity:{mounted ? 1 : 0}; transition: opacity 0.4s ease-out 1.1s;"
 				/>
 			{/if}
@@ -320,17 +322,17 @@
 					y2={padT + innerH}
 					stroke="currentColor"
 					class="text-slate-300 dark:text-slate-600"
-					stroke-width="1"
-					stroke-dasharray="3 3"
+					stroke-width="2"
+					stroke-dasharray="6 6"
 				/>
 				<circle
 					cx={x(hoverIdx)}
 					cy={y(hoverPoint.value)}
-					r="6"
+					r="11"
 					fill="white"
 					stroke="currentColor"
 					class="text-brand-500"
-					stroke-width="2.5"
+					stroke-width="4"
 				/>
 			{/if}
 		</svg>
