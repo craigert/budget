@@ -2,6 +2,7 @@
 	import { theme } from '$lib/theme.svelte';
 	import { downloadBackup, importJSON, wipeAll, type BackupFile } from '$lib/db/backup';
 	import { importCSV, type CsvImportResult } from '$lib/db/csv';
+	import { base } from '$app/paths';
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
 	import { seedIfEmpty } from '$lib/db/seed';
@@ -68,6 +69,23 @@
 		}
 	}
 
+	async function loadDemoData() {
+		if (!confirm('Load 2025 demo data? This REPLACES your current data.')) return;
+		status = '';
+		busy = true;
+		try {
+			const res = await fetch(`${base}/budget-2025-dummy.json`);
+			if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+			const data = (await res.json()) as BackupFile;
+			await importJSON(data, 'replace');
+			status = `Loaded ${data.transactions?.length ?? 0} transactions, ${data.accounts?.length ?? 0} accounts, ${data.budgets?.length ?? 0} budgets.`;
+		} catch (err) {
+			status = `Load failed: ${(err as Error).message}`;
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function reseedDefaults() {
 		if (!confirm('Re-add default categories you may have deleted?')) return;
 		await db.settings.delete('seeded');
@@ -121,7 +139,8 @@
 			<Button onclick={downloadBackup} disabled={busy}>Export JSON</Button>
 			<Button variant="secondary" onclick={() => fileInput.click()} disabled={busy}>Import JSON…</Button>
 			<Button variant="secondary" onclick={() => csvInput.click()} disabled={busy}>Import CSV…</Button>
-			<Button variant="secondary" onclick={reseedDefaults} disabled={busy}>Restore default categories</Button>
+			<Button variant="secondary" onclick={loadDemoData} disabled={busy}>Load 2025 demo data</Button>
+			<Button variant="ghost" onclick={reseedDefaults} disabled={busy}>Restore default categories</Button>
 			<input bind:this={fileInput} type="file" accept="application/json,.json" class="hidden" onchange={handleFile} />
 			<input bind:this={csvInput} type="file" accept="text/csv,.csv" class="hidden" onchange={handleCSV} />
 		</div>

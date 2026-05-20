@@ -26,7 +26,6 @@
 <aside class="hidden md:flex md:w-56 md:flex-col md:border-r md:border-slate-200 md:bg-white md:dark:border-slate-800 md:dark:bg-slate-900">
 	<a href={`${base}/`} class="flex h-16 items-center gap-2 px-5 transition-opacity hover:opacity-80">
 		<img src={`${base}/logo.png`} alt="" class="h-8 w-8" />
-		<span class="text-xl font-semibold">Budget</span>
 	</a>
 	<nav class="flex-1 space-y-1 px-3 pb-4">
 		{#each items as item (item.href)}
