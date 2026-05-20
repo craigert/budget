@@ -31,6 +31,7 @@ export interface Transaction {
 	payee: string;
 	notes: string;
 	cleared: number; // 0 | 1
+	isBusiness: number; // 0 | 1
 	createdAt: number;
 }
 

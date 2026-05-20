@@ -293,16 +293,23 @@ export async function importCSV(
 		}
 
 		// Build the transaction inserts now that maps are fully populated
-		const inserts: Transaction[] = parsed.map((p) => ({
-			date: p.date,
-			accountId: acctMap.get(p.acctName.toLowerCase())!,
-			categoryId: p.catName ? catMap.get(p.catName.toLowerCase()) ?? null : null,
-			amount: p.amount,
-			payee: p.payee,
-			notes: p.notes,
-			cleared: 1,
-			createdAt: Date.parse(p.date) || Date.now()
-		} as Transaction));
+		const inserts: Transaction[] = parsed.map((p) => {
+			const acctLower = p.acctName.toLowerCase();
+			const catLower = p.catName.toLowerCase();
+			const isBusiness =
+				acctLower.startsWith('business') || catLower === 'business expenses' ? 1 : 0;
+			return {
+				date: p.date,
+				accountId: acctMap.get(acctLower)!,
+				categoryId: p.catName ? catMap.get(catLower) ?? null : null,
+				amount: p.amount,
+				payee: p.payee,
+				notes: p.notes,
+				cleared: 1,
+				isBusiness,
+				createdAt: Date.parse(p.date) || Date.now()
+			} as Transaction;
+		});
 
 		if (inserts.length) {
 			await db.transactions.bulkAdd(inserts);

@@ -65,7 +65,8 @@
 		isExpense: true,
 		payee: '',
 		notes: '',
-		cleared: true
+		cleared: true,
+		isBusiness: false
 	});
 
 	function openCreate() {
@@ -78,7 +79,8 @@
 			isExpense: true,
 			payee: '',
 			notes: '',
-			cleared: true
+			cleared: true,
+			isBusiness: false
 		};
 		showModal = true;
 	}
@@ -93,7 +95,8 @@
 			isExpense: t.amount < 0,
 			payee: t.payee,
 			notes: t.notes,
-			cleared: t.cleared === 1
+			cleared: t.cleared === 1,
+			isBusiness: t.isBusiness === 1
 		};
 		showModal = true;
 	}
@@ -109,7 +112,8 @@
 			amount: Number(signed) || 0,
 			payee: form.payee.trim(),
 			notes: form.notes.trim(),
-			cleared: form.cleared ? 1 : 0
+			cleared: form.cleared ? 1 : 0,
+			isBusiness: form.isBusiness ? 1 : 0
 		};
 		if (editing?.id) {
 			await db.transactions.update(editing.id, payload);
@@ -317,6 +321,11 @@
 		<label class="flex items-center gap-2 text-sm">
 			<input type="checkbox" bind:checked={form.cleared} class="rounded" />
 			Cleared (transaction has posted)
+		</label>
+
+		<label class="flex items-center gap-2 text-sm">
+			<input type="checkbox" bind:checked={form.isBusiness} class="rounded" />
+			Business transaction
 		</label>
 	</form>
 	{#snippet footer()}
