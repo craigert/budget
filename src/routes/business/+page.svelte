@@ -7,6 +7,7 @@
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import BusinessFormModal from '$lib/components/BusinessFormModal.svelte';
+	import AddTransactionsToBusinessModal from '$lib/components/AddTransactionsToBusinessModal.svelte';
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
@@ -104,6 +105,7 @@
 	// Business management
 	let showBizModal = $state(false);
 	let editingBiz = $state<Business | null>(null);
+	let showAddTxModal = $state(false);
 
 	function openAddBusiness() {
 		editingBiz = null;
@@ -188,6 +190,14 @@
 
 <PageHeader title="Business" subtitle={selectedBiz ? selectedBiz.name : 'All businesses'}>
 	{#snippet actions()}
+		<Button
+			variant="onbrand"
+			size="sm"
+			onclick={() => (showAddTxModal = true)}
+			disabled={businesses.value.length === 0}
+		>
+			+ Add transactions
+		</Button>
 		<Button variant="onbrand" size="sm" onclick={openAddBusiness}>+ New business</Button>
 		{#if selectedBiz}
 			<Button variant="onbrand" size="sm" onclick={() => openEditBusiness(selectedBiz)}>Edit</Button>
@@ -351,3 +361,14 @@
 </div>
 
 <BusinessFormModal open={showBizModal} editing={editingBiz} onclose={() => (showBizModal = false)} />
+
+<AddTransactionsToBusinessModal
+	open={showAddTxModal}
+	businesses={businesses.value}
+	defaultBusinessId={selected === 'all' ? null : selected}
+	onclose={() => (showAddTxModal = false)}
+	ontagged={(count, bizId) => {
+		// Auto-switch to the business we just tagged into for instant feedback
+		selected = bizId;
+	}}
+/>
