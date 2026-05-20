@@ -76,6 +76,31 @@
 	const visible = $derived(accounts.value.filter((a) => a.archived === 0));
 	const archived = $derived(accounts.value.filter((a) => a.archived === 1));
 	const typeLabel = (t: AccountType) => ACCOUNT_TYPES.find((x) => x.value === t)?.label ?? t;
+
+	// Group accounts by purpose for the dashboard layout
+	type Group = { key: string; label: string; types: AccountType[] };
+	const GROUPS: Group[] = [
+		{ key: 'banking', label: 'Banking', types: ['checking', 'savings', 'cash'] },
+		{ key: 'credit', label: 'Credit & Loans', types: ['credit', 'loan'] },
+		{ key: 'investments', label: 'Investments', types: ['investment'] },
+		{ key: 'other', label: 'Other', types: ['other'] }
+	];
+
+	function balanceOf(a: Account): number {
+		return balances.value.get(a.id!) ?? a.openingBalance;
+	}
+
+	const groupedAccounts = $derived(
+		GROUPS.map((g) => ({
+			...g,
+			accounts: visible.filter((a) => g.types.includes(a.type))
+		})).filter((g) => g.accounts.length > 0)
+	);
+
+	const groupSubtotals = $derived(
+		new Map(groupedAccounts.map((g) => [g.key, g.accounts.reduce((s, a) => s + balanceOf(a), 0)]))
+	);
+	const netWorth = $derived(visible.reduce((s, a) => s + balanceOf(a), 0));
 </script>
 
 <PageHeader title="Accounts" subtitle="Your balances are calculated from transactions.">
@@ -84,43 +109,61 @@
 	{/snippet}
 </PageHeader>
 
-<div class="p-4 md:p-8">
+<div class="space-y-6 p-4 md:p-8">
 	{#if visible.length === 0}
 		<div class="rounded-lg border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700">
 			No accounts yet. Add one to start tracking.
 		</div>
 	{:else}
-		<ul class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-			{#each visible as a (a.id)}
-				<li class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div class="flex items-start justify-between">
-						<div>
-							<div class="text-sm text-slate-500">{typeLabel(a.type)}</div>
-							<div class="text-lg font-semibold">{a.name}</div>
-						</div>
-						<div class="flex gap-1">
-							<button
-								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-								onclick={() => openEdit(a)}
-								aria-label="Edit"
-							>
-								<Icon name="general/edit-01" size={16} />
-							</button>
-							<button
-								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-								onclick={() => archiveAccount(a)}
-								aria-label="Archive"
-							>
-								<Icon name="general/archive" size={16} />
-							</button>
-						</div>
+		<!-- Net worth summary -->
+		<div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+			<div class="section-label">Net worth</div>
+			<div class="mt-1 text-3xl font-bold tabular-nums {netWorth < 0 ? 'text-red-600' : ''}">{money(netWorth)}</div>
+			<div class="mt-1 text-xs text-slate-500">{visible.length} active account{visible.length === 1 ? '' : 's'}</div>
+		</div>
+
+		{#each groupedAccounts as g (g.key)}
+			<section>
+				<div class="mb-3 flex items-baseline justify-between">
+					<h2 class="text-lg font-semibold">{g.label}</h2>
+					<div class="text-sm text-slate-500">
+						{g.accounts.length} account{g.accounts.length === 1 ? '' : 's'} ·
+						<span class="font-medium tabular-nums {(groupSubtotals.get(g.key) ?? 0) < 0 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}">{money(groupSubtotals.get(g.key) ?? 0)}</span>
 					</div>
-					<div class="mt-3 text-2xl font-semibold tabular-nums {((balances.value.get(a.id!) ?? 0) < 0 ? 'text-red-600' : '')}">
-						{money(balances.value.get(a.id!) ?? a.openingBalance)}
-					</div>
-				</li>
-			{/each}
-		</ul>
+				</div>
+				<ul class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+					{#each g.accounts as a (a.id)}
+						<li class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+							<div class="flex items-start justify-between">
+								<div>
+									<div class="text-sm text-slate-500">{typeLabel(a.type)}</div>
+									<div class="text-lg font-semibold">{a.name}</div>
+								</div>
+								<div class="flex gap-1">
+									<button
+										class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+										onclick={() => openEdit(a)}
+										aria-label="Edit"
+									>
+										<Icon name="general/edit-01" size={16} />
+									</button>
+									<button
+										class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+										onclick={() => archiveAccount(a)}
+										aria-label="Archive"
+									>
+										<Icon name="general/archive" size={16} />
+									</button>
+								</div>
+							</div>
+							<div class="mt-3 text-2xl font-semibold tabular-nums {balanceOf(a) < 0 ? 'text-red-600' : ''}">
+								{money(balanceOf(a))}
+							</div>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/each}
 	{/if}
 
 	{#if archived.length}
