@@ -6,6 +6,7 @@
 	import { money, thisMonth, addMonths, monthLabel } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	let month = $state(thisMonth());
 
@@ -109,8 +110,8 @@
 				{@const over = budgeted > 0 && spent > budgeted}
 				<li class="border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
 					<div class="flex items-center gap-3">
-						<div class="flex h-9 w-9 items-center justify-center rounded-full text-base" style="background:{c.color}22;color:{c.color}">
-							{c.icon}
+						<div class="flex h-9 w-9 items-center justify-center rounded-full" style="background:{c.color}22;color:{c.color}">
+							<Icon name={c.icon} size={20} />
 						</div>
 						<div class="flex-1 truncate font-medium">{c.name}</div>
 						<input

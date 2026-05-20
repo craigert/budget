@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Icon from './Icon.svelte';
+
 	interface Slice {
 		label: string;
 		value: number;
@@ -77,7 +79,10 @@
 		{#each segments as seg, i (i)}
 			<li class="flex items-center gap-2">
 				<span class="h-2.5 w-2.5 shrink-0 rounded-sm" style="background:{seg.color}"></span>
-				<span class="flex-1 truncate">{seg.icon ?? ''} {seg.label}</span>
+				{#if seg.icon}
+					<span style="color:{seg.color}"><Icon name={seg.icon} size={14} /></span>
+				{/if}
+				<span class="flex-1 truncate">{seg.label}</span>
 				<span class="text-xs tabular-nums text-slate-500">{seg.pct.toFixed(0)}%</span>
 			</li>
 		{/each}

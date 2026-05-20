@@ -2,14 +2,16 @@
 	import { page } from '$app/state';
 	import { base } from '$app/paths';
 	import { theme } from '$lib/theme.svelte';
+	import { NAV_ICONS } from '$lib/icons';
+	import Icon from './Icon.svelte';
 
 	const items = [
-		{ href: '/', label: 'Home', icon: '🏠' },
-		{ href: '/transactions', label: 'Transactions', icon: '💸' },
-		{ href: '/budgets', label: 'Budgets', icon: '📊' },
-		{ href: '/accounts', label: 'Accounts', icon: '🏦' },
-		{ href: '/categories', label: 'Categories', icon: '🏷️' },
-		{ href: '/settings', label: 'Settings', icon: '⚙️' }
+		{ href: '/', label: 'Home', icon: NAV_ICONS.home },
+		{ href: '/transactions', label: 'Transactions', icon: NAV_ICONS.transactions },
+		{ href: '/budgets', label: 'Budgets', icon: NAV_ICONS.budgets },
+		{ href: '/accounts', label: 'Accounts', icon: NAV_ICONS.accounts },
+		{ href: '/categories', label: 'Categories', icon: NAV_ICONS.categories },
+		{ href: '/settings', label: 'Settings', icon: NAV_ICONS.settings }
 	];
 
 	function isActive(href: string) {
@@ -34,7 +36,7 @@
 					? 'bg-brand-500/10 text-brand-700 dark:bg-brand-500/20 dark:text-brand-100'
 					: 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}"
 			>
-				<span class="text-base">{item.icon}</span>
+				<Icon name={item.icon} size={18} />
 				{item.label}
 			</a>
 		{/each}
@@ -62,7 +64,7 @@
 				? 'text-brand-600 dark:text-brand-300'
 				: 'text-slate-500 dark:text-slate-400'}"
 		>
-			<span class="text-lg">{item.icon}</span>
+			<Icon name={item.icon} size={22} />
 			<span class="leading-none">{item.label}</span>
 		</a>
 	{/each}

@@ -13,6 +13,7 @@
 	import { base } from '$app/paths';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Donut from '$lib/components/Donut.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	const month = thisMonth();
 
@@ -97,7 +98,7 @@
 								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm"
 								style="background:{c?.color ?? '#94a3b8'}22;color:{c?.color ?? '#475569'}"
 							>
-								{c?.icon ?? '•'}
+								{#if c?.icon}<Icon name={c.icon} size={18} />{:else}<span>·</span>{/if}
 							</div>
 							<div class="min-w-0 flex-1">
 								<div class="truncate text-sm font-medium">{t.payee || c?.name || 'Transaction'}</div>

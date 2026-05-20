@@ -6,6 +6,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
@@ -155,7 +156,7 @@
 		<select bind:value={categoryFilter}>
 			<option value="">All categories</option>
 			{#each categories.value.filter((c) => c.archived === 0) as c (c.id)}
-				<option value={c.id}>{c.icon} {c.name}</option>
+				<option value={c.id}>{c.name}</option>
 			{/each}
 		</select>
 		<input type="date" bind:value={fromDate} aria-label="From date" />
@@ -183,7 +184,7 @@
 						class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
 						style="background:{cat?.color ?? '#94a3b8'}22;color:{cat?.color ?? '#475569'}"
 					>
-						{cat?.icon ?? '•'}
+						{#if cat?.icon}<Icon name={cat.icon} size={20} />{:else}<span>·</span>{/if}
 					</div>
 					<div class="min-w-0 flex-1">
 						<div class="flex items-baseline justify-between gap-2">
@@ -298,7 +299,7 @@
 			<select id="tx-cat" bind:value={form.categoryId} class="w-full">
 				<option value={null}>Uncategorized</option>
 				{#each categories.value.filter((c) => c.archived === 0 && c.kind === (form.isExpense ? 'expense' : 'income')) as c (c.id)}
-					<option value={c.id}>{c.icon} {c.name}</option>
+					<option value={c.id}>{c.name}</option>
 				{/each}
 			</select>
 		</div>
