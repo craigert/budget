@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
-	import { seedIfEmpty } from '$lib/db/seed';
+	import { bootstrap } from '$lib/db/bootstrap';
 	import { theme } from '$lib/theme.svelte';
 	import Nav from '$lib/components/Nav.svelte';
 
@@ -9,7 +9,7 @@
 	let ready = $state(false);
 
 	onMount(async () => {
-		await seedIfEmpty();
+		await bootstrap();
 		await theme.init();
 		ready = true;
 	});

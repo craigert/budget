@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { theme } from '$lib/theme.svelte';
 	import { downloadBackup, importJSON, wipeAll, type BackupFile } from '$lib/db/backup';
-	import { importCSV, type CsvImportResult } from '$lib/db/csv';
+	import { importCSV, readSpreadsheetAsCSV, type CsvImportResult } from '$lib/db/csv';
 	import { base } from '$app/paths';
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
@@ -48,9 +48,9 @@
 		if (!f) return;
 		status = '';
 		try {
-			const text = await f.text();
+			const text = await readSpreadsheetAsCSV(f);
 			const mode = confirm(
-				`Replace existing transactions with the CSV's rows?\n\nOK = REPLACE all transactions (accounts, categories, budgets kept)\nCancel = APPEND (add CSV rows on top of existing transactions)`
+				`Replace existing transactions with the file's rows?\n\nOK = REPLACE all transactions (accounts, categories, budgets kept)\nCancel = APPEND (add rows on top of existing transactions)`
 			)
 				? 'replace'
 				: 'append';
@@ -138,14 +138,14 @@
 		<div class="flex flex-wrap gap-2">
 			<Button onclick={downloadBackup} disabled={busy}>Export JSON</Button>
 			<Button variant="secondary" onclick={() => fileInput.click()} disabled={busy}>Import JSON…</Button>
-			<Button variant="secondary" onclick={() => csvInput.click()} disabled={busy}>Import CSV…</Button>
+			<Button variant="secondary" onclick={() => csvInput.click()} disabled={busy}>Import CSV / XLSX…</Button>
 			<Button variant="secondary" onclick={loadDemoData} disabled={busy}>Load demo data (12 months)</Button>
 			<Button variant="ghost" onclick={reseedDefaults} disabled={busy}>Restore default categories</Button>
 			<input bind:this={fileInput} type="file" accept="application/json,.json" class="hidden" onchange={handleFile} />
-			<input bind:this={csvInput} type="file" accept="text/csv,.csv" class="hidden" onchange={handleCSV} />
+			<input bind:this={csvInput} type="file" accept="text/csv,.csv,.xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden" onchange={handleCSV} />
 		</div>
 		<p class="mt-3 text-xs text-slate-500">
-			CSV columns expected: <code class="rounded bg-slate-100 px-1 dark:bg-slate-800">Date, Account, Type, Category, Payee, Expense, Income, Notes</code>. Missing accounts and categories are created automatically.
+			CSV/XLSX columns expected: <code class="rounded bg-slate-100 px-1 dark:bg-slate-800">Date, Account, Type, Category, Payee, Expense, Income, Notes</code>. Missing accounts and categories are created automatically. For XLSX, the first sheet is imported.
 		</p>
 		{#if status}
 			<p class="mt-3 text-sm text-slate-600 dark:text-slate-400">{status}</p>
