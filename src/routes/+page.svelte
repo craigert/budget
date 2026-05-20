@@ -10,9 +10,11 @@
 	} from '$lib/db/queries';
 	import type { Account, Category, Transaction } from '$lib/db/types';
 	import { money, thisMonth, monthLabel, formatDate } from '$lib/utils/format';
+	import { netWorthSeries } from '$lib/utils/netWorthSeries';
 	import { base } from '$app/paths';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Donut from '$lib/components/Donut.svelte';
+	import NetWorthChart from '$lib/components/NetWorthChart.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
 	const month = thisMonth();
@@ -30,6 +32,13 @@
 	const recent = live<Transaction[]>(
 		() => db.transactions.orderBy('date').reverse().limit(8).toArray(),
 		[]
+	);
+	const allAccounts = live<Account[]>(() => db.accounts.toArray(), []);
+	const allTxs = live<Transaction[]>(() => db.transactions.toArray(), []);
+
+	const currentYear = Number(thisMonth().slice(0, 4));
+	const networthPoints = $derived(
+		netWorthSeries(currentYear, allAccounts.value, allTxs.value)
 	);
 
 	const catMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
@@ -73,6 +82,14 @@
 			<div class="mt-1.5 text-3xl font-bold tabular-nums">{money(exp.value)}</div>
 		</div>
 	</div>
+
+	<!-- Net worth over the year -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-2 flex items-baseline justify-between">
+			<h2 class="text-lg font-semibold">Net worth · {currentYear}</h2>
+		</div>
+		<NetWorthChart points={networthPoints} />
+	</section>
 
 	<div class="grid gap-6 lg:grid-cols-2">
 		<!-- Spending donut -->
