@@ -11,12 +11,12 @@
 	let { points, anchorAtZero = false }: Props = $props();
 
 	// Viewport (rendered via viewBox so it scales to the container).
-	// Half-height aspect (~6.4:1) — wide and shallow for a trend strip.
+	// Half-height aspect — wide and shallow for a trend strip.
 	const W = 1600;
 	const H = 250;
-	const padL = 110;
+	const padL = 180; // wide enough for $1,000,000.00 labels
 	const padR = 40;
-	const padT = 18;
+	const padT = 22;
 	const padB = 40;
 	const innerW = W - padL - padR;
 	const innerH = H - padT - padB;
@@ -42,46 +42,15 @@
 		return padT + innerH - ((v - min) / (max - min)) * innerH;
 	};
 
-	// Monotone-cubic interpolation for smooth, non-overshooting curves.
-	function smoothPath(): string {
+	// Straight-line segments between points — angular look, easy to read at a glance.
+	function linearPath(): string {
 		if (points.length === 0) return '';
-		if (points.length === 1) {
-			const xx = x(0);
-			const yy = y(points[0].value);
-			return `M${xx},${yy}`;
-		}
-		const xs = points.map((_, i) => x(i));
-		const ys = points.map((p) => y(p.value));
-		const n = points.length;
-
-		// Compute slopes (Steffen/monotone variant)
-		const dx: number[] = new Array(n - 1);
-		const dy: number[] = new Array(n - 1);
-		const m: number[] = new Array(n);
-		for (let i = 0; i < n - 1; i++) {
-			dx[i] = xs[i + 1] - xs[i];
-			dy[i] = ys[i + 1] - ys[i];
-		}
-		m[0] = dy[0] / dx[0];
-		for (let i = 1; i < n - 1; i++) {
-			const s1 = dy[i - 1] / dx[i - 1];
-			const s2 = dy[i] / dx[i];
-			m[i] = s1 * s2 <= 0 ? 0 : (2 * s1 * s2) / (s1 + s2);
-		}
-		m[n - 1] = dy[n - 2] / dx[n - 2];
-
-		let d = `M${xs[0].toFixed(2)},${ys[0].toFixed(2)}`;
-		for (let i = 0; i < n - 1; i++) {
-			const c1x = xs[i] + dx[i] / 3;
-			const c1y = ys[i] + (m[i] * dx[i]) / 3;
-			const c2x = xs[i + 1] - dx[i] / 3;
-			const c2y = ys[i + 1] - (m[i + 1] * dx[i]) / 3;
-			d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${xs[i + 1].toFixed(2)},${ys[i + 1].toFixed(2)}`;
-		}
-		return d;
+		return points
+			.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`)
+			.join(' ');
 	}
 
-	const linePath = $derived(smoothPath());
+	const linePath = $derived(linearPath());
 	const areaPath = $derived.by(() => {
 		if (!linePath) return '';
 		const baseY = padT + innerH;
@@ -298,19 +267,20 @@
 				style="stroke-dasharray: {pathLength || 0}; stroke-dashoffset: {mounted ? 0 : pathLength || 0}; transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1);"
 			/>
 
-			<!-- Clean end-cap marker -->
-			{#if points.length > 0 && hoverIdx === null}
+			<!-- Data-point markers at every snapshot -->
+			{#each points as p, i (p.date)}
+				{@const isLatest = i === points.length - 1}
 				<circle
-					cx={x(points.length - 1)}
-					cy={y(latest)}
-					r="9"
+					cx={x(i)}
+					cy={y(p.value)}
+					r={isLatest ? 10 : 7}
 					fill="white"
 					stroke="currentColor"
 					class="text-brand-500"
 					stroke-width="4"
-					style="opacity:{mounted ? 1 : 0}; transition: opacity 0.4s ease-out 1.1s;"
+					style="opacity:{mounted ? 1 : 0}; transition: opacity 0.35s ease-out {0.4 + (i / Math.max(1, points.length)) * 0.7}s;"
 				/>
-			{/if}
+			{/each}
 
 			<!-- Hover crosshair + dot -->
 			{#if hoverPoint && hoverIdx !== null}
