@@ -26,7 +26,8 @@
 
 <!-- Desktop sidebar -->
 <aside class="hidden md:flex md:w-56 md:flex-col md:border-r md:border-slate-200 md:bg-white md:dark:border-slate-800 md:dark:bg-slate-900">
-	<a href={`${base}/`} class="flex items-center justify-center px-4 pt-6 pb-5 transition-opacity hover:opacity-80" aria-label="Home">
+	<a href={`${base}/`} class="flex flex-col items-start px-4 pt-6 pb-5 transition-opacity hover:opacity-80" aria-label="Home">
+		<span class="mb-2 text-lg font-bold text-slate-800 dark:text-slate-100">BudgetSparrow</span>
 		<img src={`${base}/logo.png`} alt="BudgetSparrow" class="h-20 w-20 object-contain" />
 	</a>
 	<nav class="flex-1 space-y-1 px-3 pb-4">
