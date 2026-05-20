@@ -10,7 +10,6 @@
 		{ href: '/transactions', label: 'Transactions', icon: NAV_ICONS.transactions },
 		{ href: '/budgets', label: 'Budgets', icon: NAV_ICONS.budgets },
 		{ href: '/accounts', label: 'Accounts', icon: NAV_ICONS.accounts },
-		{ href: '/categories', label: 'Categories', icon: NAV_ICONS.categories },
 		{ href: '/settings', label: 'Settings', icon: NAV_ICONS.settings }
 	];
 

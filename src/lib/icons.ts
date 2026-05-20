@@ -121,6 +121,5 @@ export const NAV_ICONS = {
 	transactions: 'finance-ecommerce/coins-swap',
 	budgets: 'charts/bar-chart-03',
 	accounts: 'finance-ecommerce/wallet',
-	categories: 'finance-ecommerce/tag-01',
 	settings: 'general/settings-01'
 } as const;
