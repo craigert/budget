@@ -21,6 +21,10 @@ const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
 	{ name: 'Mortgage Interest', kind: 'expense', icon: 'general/home', color: '#0369a1', archived: 0, sortOrder: 160 },
 	{ name: 'Charity', kind: 'expense', icon: 'general/heart-hand', color: '#dc2626', archived: 0, sortOrder: 170 },
 	{ name: 'Taxes Paid', kind: 'expense', icon: 'finance-ecommerce/scales', color: '#475569', archived: 0, sortOrder: 180 },
+	{ name: 'Traditional IRA', kind: 'expense', icon: 'finance-ecommerce/piggy-bank', color: '#0d9488', archived: 0, sortOrder: 190 },
+	{ name: 'Roth IRA', kind: 'expense', icon: 'finance-ecommerce/piggy-bank', color: '#7c3aed', archived: 0, sortOrder: 200 },
+	{ name: 'Solo 401(k) / SEP-IRA', kind: 'expense', icon: 'education/award-01', color: '#0891b2', archived: 0, sortOrder: 210 },
+	{ name: 'HSA Contribution', kind: 'expense', icon: 'general/heart', color: '#059669', archived: 0, sortOrder: 220 },
 	{ name: 'Other expense', kind: 'expense', icon: 'finance-ecommerce/coins-01', color: '#94a3b8', archived: 0, sortOrder: 999 },
 	// income
 	{ name: 'Salary', kind: 'income', icon: 'education/briefcase-01', color: '#22c55e', archived: 0, sortOrder: 10 },

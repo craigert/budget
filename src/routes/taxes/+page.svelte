@@ -173,6 +173,61 @@
 			mileageBuckets.charity.deduction
 	);
 
+	// === Retirement & HSA contributions ===
+	interface RetirementPlan {
+		categoryName: string;
+		label: string;
+		limit: number;
+		limitNote: string;
+		deductible: boolean;
+		schedule: string; // where it goes on the return
+	}
+	const RETIREMENT_PLANS: RetirementPlan[] = [
+		{
+			categoryName: 'Traditional IRA',
+			label: 'Traditional IRA',
+			limit: 7000,
+			limitNote: '$7,000 / $8,000 if 50+ (shared with Roth IRA)',
+			deductible: true,
+			schedule: 'Schedule 1, line 20'
+		},
+		{
+			categoryName: 'Roth IRA',
+			label: 'Roth IRA',
+			limit: 7000,
+			limitNote: '$7,000 / $8,000 if 50+ (shared with Traditional IRA)',
+			deductible: false,
+			schedule: 'Not deductible — informational'
+		},
+		{
+			categoryName: 'Solo 401(k) / SEP-IRA',
+			label: 'Solo 401(k) / SEP-IRA',
+			limit: 69000,
+			limitNote: 'Up to 25% of net SE earnings, $69,000 max',
+			deductible: true,
+			schedule: 'Schedule 1, line 16'
+		},
+		{
+			categoryName: 'HSA Contribution',
+			label: 'HSA contribution',
+			limit: 4150,
+			limitNote: '$4,150 self / $8,300 family / +$1,000 if 55+',
+			deductible: true,
+			schedule: 'Schedule 1, line 13 (Form 8889)'
+		}
+	];
+	const retirementBuckets = $derived(
+		RETIREMENT_PLANS.map((p) => {
+			const c = categoryByName(p.categoryName);
+			const tx = c ? txs.value.filter((t) => t.categoryId === c.id && t.amount < 0) : [];
+			const total = tx.reduce((s, t) => s + -t.amount, 0);
+			return { plan: p, category: c, txs: tx, total };
+		})
+	);
+	const retirementDeductibleTotal = $derived(
+		retirementBuckets.filter((b) => b.plan.deductible).reduce((s, b) => s + b.total, 0)
+	);
+
 	// === AGI (user-supplied, persisted to settings) ===
 	let agi = $state(0);
 	$effect(() => {
@@ -619,6 +674,78 @@
 										<span class="w-16 shrink-0 text-slate-500">{t.date}</span>
 										<span class="flex-1 truncate">{t.payee}</span>
 										<span class="shrink-0 tabular-nums">{money(t.amount)}</span>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/each}
+		</div>
+	</section>
+
+	<!-- Retirement & HSA contributions -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-3 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">Retirement &amp; HSA contributions</h2>
+				<p class="mt-1 text-xs text-slate-500">
+					Tag a transaction with one of these categories every time you contribute. Deductible amounts feed Schedule 1; Roth is informational.
+				</p>
+			</div>
+			<div class="text-right">
+				<div class="text-2xl font-semibold tabular-nums text-brand-500">{money(retirementDeductibleTotal)}</div>
+				<div class="text-xs text-slate-500">deductible YTD</div>
+			</div>
+		</div>
+		<div class="grid gap-3 sm:grid-cols-2">
+			{#each retirementBuckets as b (b.plan.categoryName)}
+				{@const key = `ret-${b.plan.categoryName}`}
+				{@const pct = b.plan.limit > 0 ? Math.min(100, (b.total / b.plan.limit) * 100) : 0}
+				{@const over = b.total > b.plan.limit}
+				<div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+					<div class="flex items-start justify-between gap-2">
+						<div>
+							<div class="flex items-center gap-2 font-medium">
+								{#if b.category}
+									<span style="color:{b.category.color}"><Icon name={b.category.icon} size={16} /></span>
+								{/if}
+								{b.plan.label}
+								{#if b.plan.deductible}
+									<span class="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-500/20 dark:text-brand-100">Deductible</span>
+								{:else}
+									<span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">Info</span>
+								{/if}
+							</div>
+							<div class="mt-0.5 text-xs text-slate-500">{b.plan.schedule}</div>
+						</div>
+						<div class="shrink-0 text-right">
+							<div class="text-xl font-semibold tabular-nums">{money(b.total)}</div>
+							<div class="text-xs text-slate-500">{b.txs.length} payment(s)</div>
+						</div>
+					</div>
+					<div class="mt-3">
+						<div class="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+							<div
+								class="h-full {over ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-brand-500'}"
+								style="width:{pct}%"
+							></div>
+						</div>
+						<div class="mt-1 text-[11px] text-slate-500">{b.plan.limitNote}</div>
+					</div>
+					{#if b.txs.length > 0}
+						<button class="mt-2 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand(key)}>
+							{isOpen(key) ? 'Hide' : 'Show'} transactions
+						</button>
+						{#if isOpen(key)}
+							<ul class="mt-2 max-h-40 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+								{#each b.txs as t (t.id)}
+									{@const r = renderTxRow(t)}
+									<li class="flex items-center gap-2 px-2 py-1 text-xs">
+										<span class="w-20 shrink-0 text-slate-500">{t.date}</span>
+										<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+										<span class="w-20 shrink-0 truncate text-slate-500">{r.acct?.name ?? ''}</span>
+										<span class="w-20 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
 									</li>
 								{/each}
 							</ul>
