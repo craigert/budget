@@ -70,15 +70,27 @@
 	}
 
 	async function loadDemoData() {
-		if (!confirm('Load 12 months of demo data? This REPLACES your current data.')) return;
+		if (!confirm('Reload from default-budget.xlsx? This REPLACES your transactions.')) return;
 		status = '';
 		busy = true;
 		try {
-			const res = await fetch(`${base}/budget-demo.json`);
-			if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-			const data = (await res.json()) as BackupFile;
-			await importJSON(data, 'replace');
-			status = `Loaded ${data.transactions?.length ?? 0} transactions, ${data.accounts?.length ?? 0} accounts, ${data.budgets?.length ?? 0} budgets.`;
+			// Prefer xlsx, fall back to csv
+			let csvText: string | null = null;
+			const xlsx = await fetch(`${base}/default-budget.xlsx`);
+			if (xlsx.ok) {
+				const buf = await xlsx.arrayBuffer();
+				const XLSX = await import('xlsx');
+				const wb = XLSX.read(buf, { type: 'array' });
+				const sheet = wb.SheetNames[0];
+				if (sheet) csvText = XLSX.utils.sheet_to_csv(wb.Sheets[sheet]);
+			}
+			if (!csvText) {
+				const csv = await fetch(`${base}/default-budget.csv`);
+				if (csv.ok) csvText = await csv.text();
+			}
+			if (!csvText) throw new Error('default-budget.xlsx / .csv not found in static');
+			const r: CsvImportResult = await importCSV(csvText, 'replace');
+			status = `Loaded ${r.transactionsAdded} transactions, ${r.accountsCreated} new account(s), ${r.categoriesCreated} new categor${r.categoriesCreated === 1 ? 'y' : 'ies'}.`;
 		} catch (err) {
 			status = `Load failed: ${(err as Error).message}`;
 		} finally {
@@ -139,7 +151,7 @@
 			<Button onclick={downloadBackup} disabled={busy}>Export JSON</Button>
 			<Button variant="secondary" onclick={() => fileInput.click()} disabled={busy}>Import JSON…</Button>
 			<Button variant="secondary" onclick={() => csvInput.click()} disabled={busy}>Import CSV / XLSX…</Button>
-			<Button variant="secondary" onclick={loadDemoData} disabled={busy}>Load demo data (12 months)</Button>
+			<Button variant="secondary" onclick={loadDemoData} disabled={busy}>Reload default-budget.xlsx</Button>
 			<Button variant="ghost" onclick={reseedDefaults} disabled={busy}>Restore default categories</Button>
 			<input bind:this={fileInput} type="file" accept="application/json,.json" class="hidden" onchange={handleFile} />
 			<input bind:this={csvInput} type="file" accept="text/csv,.csv,.xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden" onchange={handleCSV} />

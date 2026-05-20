@@ -3,32 +3,32 @@ import { db } from './index';
 import { seedIfEmpty } from './seed';
 import { importCSV } from './csv';
 
-async function tryFetchDefaultSpreadsheet(): Promise<string | null> {
-	const csvUrl = `${base}/budget-demo.csv`;
+async function tryFetchSpreadsheet(url: string, kind: 'csv' | 'xlsx'): Promise<string | null> {
 	try {
-		const r = await fetch(csvUrl);
-		if (r.ok) {
+		const r = await fetch(url);
+		if (!r.ok) return null;
+		if (kind === 'csv') {
 			const t = await r.text();
-			if (t.trim().length > 0) return t;
+			return t.trim().length > 0 ? t : null;
 		}
+		const buf = await r.arrayBuffer();
+		if (buf.byteLength === 0) return null;
+		const XLSX = await import('xlsx');
+		const wb = XLSX.read(buf, { type: 'array' });
+		const sheetName = wb.SheetNames[0];
+		return sheetName ? XLSX.utils.sheet_to_csv(wb.Sheets[sheetName]) : null;
 	} catch {
-		// ignore
+		return null;
 	}
+}
 
-	const xlsxUrl = `${base}/budget-demo.xlsx`;
-	try {
-		const r = await fetch(xlsxUrl);
-		if (r.ok) {
-			const buf = await r.arrayBuffer();
-			const XLSX = await import('xlsx');
-			const wb = XLSX.read(buf, { type: 'array' });
-			const sheetName = wb.SheetNames[0];
-			if (sheetName) return XLSX.utils.sheet_to_csv(wb.Sheets[sheetName]);
-		}
-	} catch {
-		// ignore
-	}
-	return null;
+async function tryFetchDefaultSpreadsheet(): Promise<string | null> {
+	// Priority: default-budget.xlsx → default-budget.xls → default-budget.csv
+	return (
+		(await tryFetchSpreadsheet(`${base}/default-budget.xlsx`, 'xlsx')) ??
+		(await tryFetchSpreadsheet(`${base}/default-budget.xls`, 'xlsx')) ??
+		(await tryFetchSpreadsheet(`${base}/default-budget.csv`, 'csv'))
+	);
 }
 
 /**
