@@ -138,7 +138,7 @@
 
 <PageHeader title="Transactions" subtitle={`${filtered.length} shown · net ${money(totalShown)}`}>
 	{#snippet actions()}
-		<Button onclick={openCreate} disabled={accounts.value.length === 0}>+ Transaction</Button>
+		<Button variant="onbrand" onclick={openCreate} disabled={accounts.value.length === 0}>+ Transaction</Button>
 	{/snippet}
 </PageHeader>
 

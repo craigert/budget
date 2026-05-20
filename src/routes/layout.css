@@ -4,11 +4,22 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-	--color-brand-50: #f0f9ff;
-	--color-brand-100: #e0f2fe;
-	--color-brand-500: #0ea5e9;
-	--color-brand-600: #0284c7;
-	--color-brand-700: #0369a1;
+	/* Mint-style emerald palette */
+	--color-brand-50: #ecfdf5;
+	--color-brand-100: #d1fae5;
+	--color-brand-200: #a7f3d0;
+	--color-brand-300: #6ee7b7;
+	--color-brand-400: #34d399;
+	--color-brand-500: #00c46a;
+	--color-brand-600: #04a85a;
+	--color-brand-700: #038049;
+	--color-brand-800: #045c36;
+	--color-brand-900: #064e3b;
+
+	/* Surface tokens */
+	--color-surface: #ffffff;
+	--color-surface-muted: #f8fafc;
+	--color-surface-strong: #f1f5f9;
 }
 
 html,
@@ -19,6 +30,7 @@ body {
 body {
 	@apply bg-slate-50 text-slate-900 antialiased;
 	@apply dark:bg-slate-950 dark:text-slate-100;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 /* Form polish */
@@ -40,4 +52,9 @@ button {
 /* No-tap-highlight on mobile */
 * {
 	-webkit-tap-highlight-color: transparent;
+}
+
+/* Mint-style section label */
+.section-label {
+	@apply text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400;
 }

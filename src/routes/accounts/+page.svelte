@@ -79,7 +79,7 @@
 
 <PageHeader title="Accounts" subtitle="Your balances are calculated from transactions.">
 	{#snippet actions()}
-		<Button onclick={openCreate}>+ Account</Button>
+		<Button variant="onbrand" onclick={openCreate}>+ Account</Button>
 	{/snippet}
 </PageHeader>
 

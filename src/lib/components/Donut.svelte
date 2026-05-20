@@ -57,14 +57,14 @@
 			/>
 		{/each}
 		<g transform="rotate(90 {size / 2} {size / 2})">
-			{#if centerValue}
-				<text x={size / 2} y={size / 2 - 2} text-anchor="middle" dominant-baseline="middle" class="fill-slate-900 dark:fill-slate-100" font-size="20" font-weight="600">
-					{centerValue}
+			{#if centerLabel}
+				<text x={size / 2} y={size / 2 - 14} text-anchor="middle" dominant-baseline="middle" class="fill-slate-400" font-size="10" font-weight="600" letter-spacing="1.5">
+					{centerLabel.toUpperCase()}
 				</text>
 			{/if}
-			{#if centerLabel}
-				<text x={size / 2} y={size / 2 + 20} text-anchor="middle" dominant-baseline="middle" class="fill-slate-500" font-size="11">
-					{centerLabel}
+			{#if centerValue}
+				<text x={size / 2} y={size / 2 + 8} text-anchor="middle" dominant-baseline="middle" class="fill-brand-500" font-size="24" font-weight="700">
+					{centerValue}
 				</text>
 			{/if}
 		</g>

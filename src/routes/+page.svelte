@@ -60,16 +60,16 @@
 	<!-- KPI tiles -->
 	<div class="grid gap-3 sm:grid-cols-3">
 		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="text-xs uppercase tracking-wide text-slate-500">Net worth</div>
-			<div class="mt-1 text-3xl font-semibold tabular-nums {nw.value < 0 ? 'text-red-600' : ''}">{money(nw.value)}</div>
+			<div class="section-label">Net worth</div>
+			<div class="mt-1.5 text-3xl font-bold tabular-nums {nw.value < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'}">{money(nw.value)}</div>
 		</div>
 		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="text-xs uppercase tracking-wide text-slate-500">Income this month</div>
-			<div class="mt-1 text-3xl font-semibold tabular-nums text-emerald-600">{money(inc.value)}</div>
+			<div class="section-label">Income this month</div>
+			<div class="mt-1.5 text-3xl font-bold tabular-nums text-brand-500">{money(inc.value)}</div>
 		</div>
 		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="text-xs uppercase tracking-wide text-slate-500">Spending this month</div>
-			<div class="mt-1 text-3xl font-semibold tabular-nums">{money(exp.value)}</div>
+			<div class="section-label">Spending this month</div>
+			<div class="mt-1.5 text-3xl font-bold tabular-nums">{money(exp.value)}</div>
 		</div>
 	</div>
 

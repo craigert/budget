@@ -70,10 +70,10 @@
 
 <PageHeader title="Budgets" subtitle={monthLabel(month)}>
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={() => (month = addMonths(month, -1))}>←</Button>
-		<Button variant="secondary" size="sm" onclick={() => (month = thisMonth())}>Today</Button>
-		<Button variant="secondary" size="sm" onclick={() => (month = addMonths(month, 1))}>→</Button>
-		<Button variant="secondary" size="sm" onclick={copyPrevious}>Copy last month</Button>
+		<Button variant="onbrand" size="sm" onclick={() => (month = addMonths(month, -1))}>←</Button>
+		<Button variant="onbrand" size="sm" onclick={() => (month = thisMonth())}>Today</Button>
+		<Button variant="onbrand" size="sm" onclick={() => (month = addMonths(month, 1))}>→</Button>
+		<Button variant="onbrand" size="sm" onclick={copyPrevious}>Copy last month</Button>
 	{/snippet}
 </PageHeader>
 
