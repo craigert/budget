@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
-	import type { Account, Category, NestEgg, NestEggTrackingMode } from '$lib/db/types';
+	import type { Account, Category, Goal, GoalTrackingMode } from '$lib/db/types';
 	import { ICON_GROUPS } from '$lib/icons';
 	import Modal from './Modal.svelte';
 	import Button from './Button.svelte';
@@ -9,7 +9,7 @@
 
 	interface Props {
 		open: boolean;
-		editing: NestEgg | null;
+		editing: Goal | null;
 		onclose: () => void;
 		onsaved?: (id: number) => void;
 	}
@@ -37,8 +37,8 @@
 		targetAmount: 0,
 		deadline: '',
 		startDate: new Date().toISOString().slice(0, 10),
-		trackingMode: 'account' as NestEggTrackingMode,
-		accountId: null as number | null,
+		trackingMode: 'account' as GoalTrackingMode,
+		accountIds: new Set<number>(),
 		categoryId: null as number | null,
 		baselineAmount: 0,
 		notes: ''
@@ -56,7 +56,7 @@
 					deadline: editing.deadline ?? '',
 					startDate: editing.startDate,
 					trackingMode: editing.trackingMode,
-					accountId: editing.accountIds[0] ?? null,
+					accountIds: new Set(editing.accountIds),
 					categoryId: editing.categoryId,
 					baselineAmount: editing.baselineAmount,
 					notes: editing.notes
@@ -70,7 +70,7 @@
 					deadline: '',
 					startDate: new Date().toISOString().slice(0, 10),
 					trackingMode: 'account',
-					accountId: accounts.value[0]?.id ?? null,
+					accountIds: new Set<number>(),
 					categoryId: null,
 					baselineAmount: 0,
 					notes: ''
@@ -94,10 +94,17 @@
 		return name.replace(/-\d+$/, '').replace(/-/g, ' ');
 	}
 
+	function toggleAccount(id: number) {
+		const next = new Set(form.accountIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		form.accountIds = next;
+	}
+
 	async function save(e: Event) {
 		e.preventDefault();
 		if (!form.name.trim() || !(form.targetAmount > 0)) return;
-		const payload: Omit<NestEgg, 'id' | 'createdAt' | 'sortOrder' | 'archived'> = {
+		const payload: Omit<Goal, 'id' | 'createdAt' | 'sortOrder' | 'archived'> = {
 			name: form.name.trim(),
 			icon: form.icon,
 			color: form.color,
@@ -105,7 +112,7 @@
 			deadline: form.deadline || null,
 			startDate: form.startDate,
 			trackingMode: form.trackingMode,
-			accountIds: form.trackingMode === 'account' && form.accountId != null ? [form.accountId] : [],
+			accountIds: form.trackingMode === 'account' ? [...form.accountIds] : [],
 			categoryId: form.trackingMode === 'category' ? form.categoryId : null,
 			baselineAmount: Number(form.baselineAmount) || 0,
 			notes: form.notes.trim()
@@ -117,19 +124,19 @@
 		} else {
 			const maxSort = await db.nestEggs
 				.toArray()
-				.then((arr) => arr.reduce((m, e) => Math.max(m, e.sortOrder), 0));
+				.then((arr) => arr.reduce((m, g) => Math.max(m, g.sortOrder), 0));
 			id = (await db.nestEggs.add({
 				...payload,
 				archived: 0,
 				sortOrder: maxSort + 10,
 				createdAt: Date.now()
-			} as NestEgg)) as number;
+			} as Goal)) as number;
 		}
 		onsaved?.(id);
 		onclose();
 	}
 
-	async function deleteEgg() {
+	async function deleteGoal() {
 		if (!editing?.id) return;
 		if (!confirm(`Delete "${editing.name}"?`)) return;
 		await db.nestEggs.delete(editing.id);
@@ -137,21 +144,21 @@
 	}
 </script>
 
-<Modal {open} title={editing ? 'Edit nest egg' : 'New nest egg'} {onclose}>
+<Modal {open} title={editing ? 'Edit goal' : 'New goal'} {onclose}>
 	<form onsubmit={save} class="space-y-4">
 		<div>
-			<label for="ne-name" class="mb-1 block text-sm font-medium">Name</label>
-			<input id="ne-name" type="text" bind:value={form.name} class="w-full" required autofocus placeholder="e.g. Emergency Fund" />
+			<label for="g-name" class="mb-1 block text-sm font-medium">Name</label>
+			<input id="g-name" type="text" bind:value={form.name} class="w-full" required autofocus placeholder="e.g. Emergency Fund, Down Payment, Boat" />
 		</div>
 
 		<div class="grid grid-cols-2 gap-3">
 			<div>
-				<label for="ne-target" class="mb-1 block text-sm font-medium">Target amount</label>
-				<input id="ne-target" type="number" step="100" min="0" bind:value={form.targetAmount} class="w-full" required />
+				<label for="g-target" class="mb-1 block text-sm font-medium">Target amount</label>
+				<input id="g-target" type="number" step="100" min="0" bind:value={form.targetAmount} class="w-full" required />
 			</div>
 			<div>
-				<label for="ne-deadline" class="mb-1 block text-sm font-medium">Deadline (optional)</label>
-				<input id="ne-deadline" type="date" bind:value={form.deadline} class="w-full" />
+				<label for="g-deadline" class="mb-1 block text-sm font-medium">Deadline (optional)</label>
+				<input id="g-deadline" type="date" bind:value={form.deadline} class="w-full" />
 			</div>
 		</div>
 
@@ -165,7 +172,7 @@
 						: 'bg-transparent text-slate-700 dark:text-slate-300'}"
 					onclick={() => (form.trackingMode = 'account')}
 				>
-					Account balance
+					Account balance(s)
 				</button>
 				<button
 					type="button"
@@ -181,21 +188,38 @@
 
 		{#if form.trackingMode === 'account'}
 			<div>
-				<label for="ne-account" class="mb-1 block text-sm font-medium">Linked account</label>
-				<select id="ne-account" bind:value={form.accountId} class="w-full" required>
-					<option value={null} disabled>— pick an account —</option>
-					{#each accounts.value as a (a.id)}
-						<option value={a.id}>{a.name}</option>
-					{/each}
-				</select>
-				<p class="mt-1 text-xs text-slate-500">
-					Progress = current balance of this account minus the baseline below.
-				</p>
+				<div class="mb-1 flex items-baseline justify-between">
+					<span class="block text-sm font-medium">Linked accounts</span>
+					<span class="text-xs text-slate-500">{form.accountIds.size} selected</span>
+				</div>
+				{#if accounts.value.length === 0}
+					<p class="rounded-md border border-dashed border-slate-300 p-3 text-sm text-slate-500 dark:border-slate-700">
+						No accounts yet. Add one on the Accounts page first.
+					</p>
+				{:else}
+					<div class="max-h-44 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-1 dark:border-slate-700">
+						{#each accounts.value as a (a.id)}
+							<label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
+								<input
+									type="checkbox"
+									class="shrink-0 rounded"
+									checked={form.accountIds.has(a.id!)}
+									onchange={() => toggleAccount(a.id!)}
+								/>
+								<span class="flex-1 truncate">{a.name}</span>
+								<span class="shrink-0 text-xs text-slate-500 capitalize">{a.type}</span>
+							</label>
+						{/each}
+					</div>
+					<p class="mt-1 text-xs text-slate-500">
+						Progress = combined balance of the checked accounts (minus the baseline below).
+					</p>
+				{/if}
 			</div>
 		{:else}
 			<div>
-				<label for="ne-cat" class="mb-1 block text-sm font-medium">Contribution category</label>
-				<select id="ne-cat" bind:value={form.categoryId} class="w-full" required>
+				<label for="g-cat" class="mb-1 block text-sm font-medium">Contribution category</label>
+				<select id="g-cat" bind:value={form.categoryId} class="w-full" required>
 					<option value={null} disabled>— pick a category —</option>
 					{#each categories.value as c (c.id)}
 						<option value={c.id}>{c.name}</option>
@@ -209,13 +233,13 @@
 
 		<div class="grid grid-cols-2 gap-3">
 			<div>
-				<label for="ne-start" class="mb-1 block text-sm font-medium">Start date</label>
-				<input id="ne-start" type="date" bind:value={form.startDate} class="w-full" />
+				<label for="g-start" class="mb-1 block text-sm font-medium">Start date</label>
+				<input id="g-start" type="date" bind:value={form.startDate} class="w-full" />
 			</div>
 			<div>
-				<label for="ne-baseline" class="mb-1 block text-sm font-medium">Baseline (offset)</label>
-				<input id="ne-baseline" type="number" step="0.01" bind:value={form.baselineAmount} class="w-full" />
-				<p class="mt-0.5 text-[10px] text-slate-500">Subtracted from progress so a savings account that already has money doesn't show as 100% complete.</p>
+				<label for="g-baseline" class="mb-1 block text-sm font-medium">Baseline (offset)</label>
+				<input id="g-baseline" type="number" step="0.01" bind:value={form.baselineAmount} class="w-full" />
+				<p class="mt-0.5 text-[10px] text-slate-500">Subtracted from progress so an account that already has money doesn't show as 100% complete.</p>
 			</div>
 		</div>
 
@@ -267,13 +291,13 @@
 		</div>
 
 		<div>
-			<label for="ne-notes" class="mb-1 block text-sm font-medium">Notes</label>
-			<textarea id="ne-notes" bind:value={form.notes} rows="2" class="w-full"></textarea>
+			<label for="g-notes" class="mb-1 block text-sm font-medium">Notes</label>
+			<textarea id="g-notes" bind:value={form.notes} rows="2" class="w-full"></textarea>
 		</div>
 	</form>
 	{#snippet footer()}
 		{#if editing}
-			<button class="text-sm text-red-600 hover:underline" onclick={deleteEgg}>Delete</button>
+			<button class="text-sm text-red-600 hover:underline" onclick={deleteGoal}>Delete</button>
 		{/if}
 		<div class="ml-auto flex gap-2">
 			<Button variant="secondary" onclick={onclose}>Cancel</Button>

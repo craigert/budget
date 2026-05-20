@@ -47,9 +47,9 @@ export interface Business {
 	createdAt: number;
 }
 
-export type NestEggTrackingMode = 'account' | 'category';
+export type GoalTrackingMode = 'account' | 'category';
 
-export interface NestEgg {
+export interface Goal {
 	id?: number;
 	name: string;
 	icon: string;
@@ -57,7 +57,7 @@ export interface NestEgg {
 	targetAmount: number;
 	deadline: string | null; // YYYY-MM-DD; null = no deadline
 	startDate: string; // YYYY-MM-DD; when tracking began
-	trackingMode: NestEggTrackingMode;
+	trackingMode: GoalTrackingMode;
 	/** For 'account' mode: sum the balances of these accounts. */
 	accountIds: number[];
 	/** For 'category' mode: sum all incoming (positive) transactions in this category since startDate. */

@@ -3,8 +3,8 @@ import type {
 	Account,
 	Business,
 	Category,
+	Goal,
 	Mileage,
-	NestEgg,
 	Transaction,
 	Budget,
 	Setting
@@ -18,7 +18,8 @@ export class BudgetDB extends Dexie {
 	settings!: Table<Setting, string>;
 	businesses!: Table<Business, number>;
 	mileage!: Table<Mileage, number>;
-	nestEggs!: Table<NestEgg, number>;
+	/** Stored under the legacy `nestEggs` table name; user-facing term is "Goals". */
+	nestEggs!: Table<Goal, number>;
 
 	constructor() {
 		super('budget');

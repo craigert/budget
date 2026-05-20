@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
-	import type { Account, Category, NestEgg, Transaction } from '$lib/db/types';
-	import { nestEggCurrent, nestEggProgress } from '$lib/db/nestEggs';
+	import type { Account, Category, Goal, Transaction } from '$lib/db/types';
+	import { goalCurrent, goalProgress } from '$lib/db/goals';
 	import { money } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import NestEggFormModal from '$lib/components/NestEggFormModal.svelte';
+	import GoalFormModal from '$lib/components/GoalFormModal.svelte';
 
-	const eggs = live<NestEgg[]>(
+	const goals = live<Goal[]>(
 		() =>
 			db.nestEggs
 				.where('archived')
@@ -18,7 +18,6 @@
 				.then((arr) => arr.sort((a, b) => a.sortOrder - b.sortOrder)),
 		[]
 	);
-	// Live but only used as a trigger for re-computing progress when balances change
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
 	const txs = live<Transaction[]>(() => db.transactions.toArray(), []);
@@ -26,44 +25,41 @@
 	const categoryMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
 	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
 
-	// Map of egg.id → current saved. Recomputes when any input changes.
 	let currents = $state<Map<number, number>>(new Map());
 	$effect(() => {
-		const list = eggs.value;
-		// Reference live deps so this effect re-runs on changes
+		const list = goals.value;
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		accounts.value;
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		txs.value;
 		(async () => {
 			const next = new Map<number, number>();
-			for (const egg of list) {
-				if (egg.id == null) continue;
-				next.set(egg.id, await nestEggCurrent(egg));
+			for (const g of list) {
+				if (g.id == null) continue;
+				next.set(g.id, await goalCurrent(g));
 			}
 			currents = next;
 		})();
 	});
 
-	// Totals across all goals
 	const totals = $derived.by(() => {
 		let saved = 0;
 		let target = 0;
-		for (const egg of eggs.value) {
-			target += egg.targetAmount;
-			saved += currents.get(egg.id!) ?? 0;
+		for (const g of goals.value) {
+			target += g.targetAmount;
+			saved += currents.get(g.id!) ?? 0;
 		}
 		return { saved, target };
 	});
 
 	let showModal = $state(false);
-	let editing = $state<NestEgg | null>(null);
+	let editing = $state<Goal | null>(null);
 	function openCreate() {
 		editing = null;
 		showModal = true;
 	}
-	function openEdit(e: NestEgg) {
-		editing = e;
+	function openEdit(g: Goal) {
+		editing = g;
 		showModal = true;
 	}
 
@@ -77,7 +73,7 @@
 		});
 	}
 
-	function paceLabel(pace: ReturnType<typeof nestEggProgress>['pace']) {
+	function paceLabel(pace: ReturnType<typeof goalProgress>['pace']) {
 		switch (pace) {
 			case 'complete':
 				return { label: '✓ Reached', cls: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200' };
@@ -95,33 +91,42 @@
 		}
 	}
 
-	function barColor(p: ReturnType<typeof nestEggProgress>): string {
+	function barColor(p: ReturnType<typeof goalProgress>): string {
 		if (p.complete) return 'bg-brand-500';
 		if (p.pace === 'overdue') return 'bg-red-500';
 		if (p.pace === 'behind') return 'bg-amber-500';
 		if (p.pace === 'ahead') return 'bg-brand-500';
 		return 'bg-emerald-500';
 	}
+
+	function linkedAccountsLabel(g: Goal): string {
+		const names = g.accountIds
+			.map((id) => accountMap.get(id)?.name)
+			.filter((n): n is string => Boolean(n));
+		if (names.length === 0) return 'No accounts linked';
+		if (names.length <= 2) return names.join(' + ');
+		return `${names[0]} + ${names.length - 1} more`;
+	}
 </script>
 
-<PageHeader title="Nest Eggs" subtitle="Track savings goals toward each milestone">
+<PageHeader title="Goals" subtitle="Track savings toward what matters">
 	{#snippet actions()}
-		<Button variant="onbrand" size="sm" onclick={openCreate}>+ New nest egg</Button>
+		<Button variant="onbrand" size="sm" onclick={openCreate}>+ New goal</Button>
 	{/snippet}
 </PageHeader>
 
 <div class="space-y-6 p-4 md:p-8">
-	{#if eggs.value.length === 0}
+	{#if goals.value.length === 0}
 		<div class="rounded-lg border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
 			<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/15">
 				<Icon name="finance-ecommerce/piggy-bank" size={28} />
 			</div>
-			<h2 class="text-lg font-semibold">Set your first savings goal</h2>
+			<h2 class="text-lg font-semibold">Set your first goal</h2>
 			<p class="mt-1 text-sm text-slate-500">
-				Examples: Emergency Fund, Down Payment, Vacation, Roth IRA Max.
+				Examples: Emergency Fund · Down Payment · Boat · Swimming Pool · Warhammer Figurines · Lego Sets
 			</p>
 			<div class="mt-4">
-				<Button onclick={openCreate}>+ New nest egg</Button>
+				<Button onclick={openCreate}>+ New goal</Button>
 			</div>
 		</div>
 	{:else}
@@ -136,7 +141,7 @@
 				<div class="mt-1 text-2xl font-bold tabular-nums">{money(totals.target)}</div>
 			</div>
 			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-				<div class="section-label">{eggs.value.length} active goal{eggs.value.length === 1 ? '' : 's'}</div>
+				<div class="section-label">{goals.value.length} active goal{goals.value.length === 1 ? '' : 's'}</div>
 				<div class="mt-1 text-2xl font-bold tabular-nums {totals.target > 0 ? '' : 'text-slate-400'}">
 					{totals.target > 0 ? `${Math.round((totals.saved / totals.target) * 100)}%` : '—'}
 				</div>
@@ -145,32 +150,32 @@
 
 		<!-- Goal cards -->
 		<ul class="grid gap-4 md:grid-cols-2">
-			{#each eggs.value as e (e.id)}
-				{@const current = currents.get(e.id!) ?? 0}
-				{@const p = nestEggProgress(e, current)}
+			{#each goals.value as g (g.id)}
+				{@const current = currents.get(g.id!) ?? 0}
+				{@const p = goalProgress(g, current)}
 				{@const pl = paceLabel(p.pace)}
 				{@const pct = Math.min(100, Math.max(0, p.percent))}
 				<li class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div class="flex items-start gap-3">
-						<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style="background:{e.color}22;color:{e.color}">
-							<Icon name={e.icon} size={22} />
+						<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style="background:{g.color}22;color:{g.color}">
+							<Icon name={g.icon} size={22} />
 						</div>
 						<div class="min-w-0 flex-1">
 							<div class="flex items-baseline justify-between gap-2">
-								<h3 class="truncate text-lg font-semibold">{e.name}</h3>
+								<h3 class="truncate text-lg font-semibold">{g.name}</h3>
 								<span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {pl.cls}">{pl.label}</span>
 							</div>
-							<div class="mt-0.5 text-xs text-slate-500">
-								{#if e.trackingMode === 'account'}
-									{accountMap.get(e.accountIds[0] ?? -1)?.name ?? 'Unlinked account'}
+							<div class="mt-0.5 truncate text-xs text-slate-500">
+								{#if g.trackingMode === 'account'}
+									{linkedAccountsLabel(g)}
 								{:else}
-									{categoryMap.get(e.categoryId ?? -1)?.name ?? 'Unlinked category'} contributions
+									{categoryMap.get(g.categoryId ?? -1)?.name ?? 'Unlinked category'} contributions
 								{/if}
 							</div>
 						</div>
 						<button
 							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-							onclick={() => openEdit(e)}
+							onclick={() => openEdit(g)}
 							aria-label="Edit"
 						>
 							<Icon name="general/edit-01" size={16} />
@@ -181,7 +186,7 @@
 					<div class="mt-4 flex items-baseline justify-between gap-2">
 						<div>
 							<div class="text-3xl font-bold tabular-nums">{money(current)}</div>
-							<div class="text-sm text-slate-500">of {money(e.targetAmount)}</div>
+							<div class="text-sm text-slate-500">of {money(g.targetAmount)}</div>
 						</div>
 						<div class="text-right">
 							<div class="text-2xl font-bold tabular-nums {p.complete ? 'text-brand-500' : ''}">{Math.round(p.percent)}%</div>
@@ -193,7 +198,7 @@
 						</div>
 					</div>
 
-					<!-- Progress bar (with expected marker if deadline present) -->
+					<!-- Progress bar with on-pace marker -->
 					<div class="mt-3">
 						<div class="relative h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
 							<div class="h-full transition-all {barColor(p)}" style="width:{pct}%"></div>
@@ -207,11 +212,26 @@
 						</div>
 					</div>
 
+					<!-- Linked accounts chips (when 2+) -->
+					{#if g.trackingMode === 'account' && g.accountIds.length > 1}
+						<div class="mt-3 flex flex-wrap gap-1.5">
+							{#each g.accountIds as id (id)}
+								{@const a = accountMap.get(id)}
+								{#if a}
+									<span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+										<Icon name="finance-ecommerce/wallet" size={11} />
+										{a.name}
+									</span>
+								{/if}
+							{/each}
+						</div>
+					{/if}
+
 					<!-- Footer info -->
 					<div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
 						<div>
-							{#if e.deadline}
-								<span class="font-medium">{formatDate(e.deadline)}</span>
+							{#if g.deadline}
+								<span class="font-medium">{formatDate(g.deadline)}</span>
 								{#if p.daysLeft != null}
 									· <span>{p.daysLeft >= 0 ? `${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left` : `${-p.daysLeft} day${p.daysLeft === -1 ? '' : 's'} past`}</span>
 								{/if}
@@ -226,9 +246,9 @@
 						{/if}
 					</div>
 
-					{#if e.notes}
+					{#if g.notes}
 						<p class="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
-							{e.notes}
+							{g.notes}
 						</p>
 					{/if}
 				</li>
@@ -237,4 +257,4 @@
 	{/if}
 </div>
 
-<NestEggFormModal open={showModal} editing={editing} onclose={() => (showModal = false)} />
+<GoalFormModal open={showModal} editing={editing} onclose={() => (showModal = false)} />

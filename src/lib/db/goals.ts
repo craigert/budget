@@ -1,18 +1,17 @@
 import { db } from './index';
-import type { NestEgg } from './types';
+import type { Goal } from './types';
 
-export interface NestEggProgress {
-	current: number; // dollars saved toward the target
-	percent: number; // 0–100+ (can exceed 100 if overfunded)
+export interface GoalProgress {
+	current: number;
+	percent: number;
 	complete: boolean;
 	target: number;
 	remaining: number;
-	/** Days until deadline (negative if past). null when no deadline. */
 	daysLeft: number | null;
-	totalDays: number | null; // null when no deadline
-	expectedPercent: number | null; // % we'd be at on a linear schedule
+	totalDays: number | null;
+	expectedPercent: number | null;
 	pace: 'ahead' | 'on-track' | 'behind' | 'no-deadline' | 'complete' | 'overdue';
-	projectedCompletion: string | null; // YYYY-MM-DD based on current contribution rate
+	projectedCompletion: string | null;
 }
 
 function daysBetween(a: string, b: string): number {
@@ -24,40 +23,40 @@ function isoToday(): string {
 	return new Date().toISOString().slice(0, 10);
 }
 
-/** Resolve current saved-amount for a Nest Egg based on its tracking mode. */
-export async function nestEggCurrent(egg: NestEgg): Promise<number> {
-	if (egg.trackingMode === 'account') {
-		if (egg.accountIds.length === 0) return 0;
-		const accounts = await db.accounts.bulkGet(egg.accountIds);
+/** Resolve current saved-amount for a Goal based on its tracking mode. */
+export async function goalCurrent(goal: Goal): Promise<number> {
+	if (goal.trackingMode === 'account') {
+		if (goal.accountIds.length === 0) return 0;
+		const accounts = await db.accounts.bulkGet(goal.accountIds);
 		let total = 0;
 		for (const a of accounts) {
 			if (!a) continue;
 			total += a.openingBalance;
 		}
 		await db.transactions.each((t) => {
-			if (egg.accountIds.includes(t.accountId)) total += t.amount;
+			if (goal.accountIds.includes(t.accountId)) total += t.amount;
 		});
-		return Math.round((total - egg.baselineAmount) * 100) / 100;
+		return Math.round((total - goal.baselineAmount) * 100) / 100;
 	}
-	if (egg.trackingMode === 'category') {
-		if (egg.categoryId == null) return 0;
+	if (goal.trackingMode === 'category') {
+		if (goal.categoryId == null) return 0;
 		let total = 0;
 		await db.transactions.each((t) => {
-			if (t.categoryId !== egg.categoryId) return;
-			if (t.date < egg.startDate) return;
+			if (t.categoryId !== goal.categoryId) return;
+			if (t.date < goal.startDate) return;
 			// Contributions are typically expense-direction (money out of checking
 			// into savings) — flip the sign so progress goes up.
 			if (t.amount < 0) total += -t.amount;
 			else total += t.amount;
 		});
-		return Math.round((total - egg.baselineAmount) * 100) / 100;
+		return Math.round((total - goal.baselineAmount) * 100) / 100;
 	}
 	return 0;
 }
 
 /** Compute progress + pace given a current saved amount. Pure / synchronous. */
-export function nestEggProgress(egg: NestEgg, current: number): NestEggProgress {
-	const target = egg.targetAmount;
+export function goalProgress(goal: Goal, current: number): GoalProgress {
+	const target = goal.targetAmount;
 	const safeTarget = target > 0 ? target : 1;
 	const percent = (current / safeTarget) * 100;
 	const remaining = Math.max(0, target - current);
@@ -68,11 +67,11 @@ export function nestEggProgress(egg: NestEgg, current: number): NestEggProgress 
 	let totalDays: number | null = null;
 	let expectedPercent: number | null = null;
 	let projectedCompletion: string | null = null;
-	let pace: NestEggProgress['pace'] = 'no-deadline';
+	let pace: GoalProgress['pace'] = 'no-deadline';
 
-	if (egg.deadline) {
-		daysLeft = daysBetween(today, egg.deadline);
-		totalDays = daysBetween(egg.startDate, egg.deadline);
+	if (goal.deadline) {
+		daysLeft = daysBetween(today, goal.deadline);
+		totalDays = daysBetween(goal.startDate, goal.deadline);
 		const elapsed = totalDays - daysLeft;
 		expectedPercent = totalDays > 0 ? Math.min(100, Math.max(0, (elapsed / totalDays) * 100)) : 100;
 
@@ -81,9 +80,8 @@ export function nestEggProgress(egg: NestEgg, current: number): NestEggProgress 
 		else if (percent + 5 >= expectedPercent) pace = percent >= expectedPercent + 5 ? 'ahead' : 'on-track';
 		else pace = 'behind';
 
-		// Project completion at the current contribution rate since startDate
-		const elapsedDays = daysBetween(egg.startDate, today);
-		if (!complete && elapsedDays > 0 && current > egg.baselineAmount) {
+		const elapsedDays = daysBetween(goal.startDate, today);
+		if (!complete && elapsedDays > 0 && current > goal.baselineAmount) {
 			const dailyRate = current / elapsedDays;
 			if (dailyRate > 0) {
 				const daysToFinish = Math.ceil(remaining / dailyRate);
