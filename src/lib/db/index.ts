@@ -1,5 +1,14 @@
 import Dexie, { type Table } from 'dexie';
-import type { Account, Business, Category, Mileage, Transaction, Budget, Setting } from './types';
+import type {
+	Account,
+	Business,
+	Category,
+	Mileage,
+	NestEgg,
+	Transaction,
+	Budget,
+	Setting
+} from './types';
 
 export class BudgetDB extends Dexie {
 	accounts!: Table<Account, number>;
@@ -9,6 +18,7 @@ export class BudgetDB extends Dexie {
 	settings!: Table<Setting, string>;
 	businesses!: Table<Business, number>;
 	mileage!: Table<Mileage, number>;
+	nestEggs!: Table<NestEgg, number>;
 
 	constructor() {
 		super('budget');
@@ -80,6 +90,11 @@ export class BudgetDB extends Dexie {
 		// v4: mileage logs for tax dashboard
 		this.version(4).stores({
 			mileage: '++id, date, kind, businessId, createdAt'
+		});
+
+		// v5: nest eggs (savings goals)
+		this.version(5).stores({
+			nestEggs: '++id, name, archived, sortOrder, deadline, createdAt'
 		});
 	}
 }

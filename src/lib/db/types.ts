@@ -47,6 +47,29 @@ export interface Business {
 	createdAt: number;
 }
 
+export type NestEggTrackingMode = 'account' | 'category';
+
+export interface NestEgg {
+	id?: number;
+	name: string;
+	icon: string;
+	color: string;
+	targetAmount: number;
+	deadline: string | null; // YYYY-MM-DD; null = no deadline
+	startDate: string; // YYYY-MM-DD; when tracking began
+	trackingMode: NestEggTrackingMode;
+	/** For 'account' mode: sum the balances of these accounts. */
+	accountIds: number[];
+	/** For 'category' mode: sum all incoming (positive) transactions in this category since startDate. */
+	categoryId: number | null;
+	/** Optional baseline balance to subtract before counting (so progress starts from 0). */
+	baselineAmount: number;
+	notes: string;
+	archived: number;
+	sortOrder: number;
+	createdAt: number;
+}
+
 export type MileageKind = 'business' | 'medical' | 'charity';
 
 export interface Mileage {
