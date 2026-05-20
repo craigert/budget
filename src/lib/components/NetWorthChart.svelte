@@ -189,6 +189,7 @@
 			{/if}
 		</div>
 
+		<div class="relative">
 		<svg
 			bind:this={svgEl}
 			viewBox="0 0 {W} {H}"
@@ -306,14 +307,28 @@
 			{/if}
 		</svg>
 
-		<!-- Hover tooltip (positioned in flow, below the chart) -->
-		{#if hoverPoint}
-			<div class="flex items-center justify-between rounded-md border border-slate-200 bg-white/95 px-3 py-1.5 text-sm shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-				<span class="text-slate-500">{fmtDate(hoverPoint.date)}</span>
-				<span class="font-semibold tabular-nums {hoverPoint.value < 0 ? 'text-red-600' : ''}">{money(hoverPoint.value)}</span>
-			</div>
-		{:else}
-			<div class="h-7"></div>
-		{/if}
+			<!-- Floating tooltip anchored to the hovered data point -->
+			{#if hoverPoint && hoverIdx !== null}
+				{@const pctX = (x(hoverIdx) / W) * 100}
+				{@const pctY = (y(hoverPoint.value) / H) * 100}
+				{@const flipBelow = pctY < 35}
+				<div
+					class="pointer-events-none absolute z-10 whitespace-nowrap"
+					style="left:{pctX}%; top:{pctY}%; transform: translate(-50%, {flipBelow ? 'calc(0% + 14px)' : 'calc(-100% - 14px)'});"
+				>
+					<div class="relative rounded-md bg-slate-900 px-3 py-1.5 text-xs shadow-lg ring-1 ring-black/5 dark:bg-slate-100">
+						<div class="text-slate-300 dark:text-slate-600">{fmtDate(hoverPoint.date)}</div>
+						<div class="text-sm font-semibold tabular-nums text-white dark:text-slate-900">
+							{money(hoverPoint.value)}
+						</div>
+						<!-- Pointer arrow -->
+						<div
+							class="absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900 dark:bg-slate-100"
+							style="{flipBelow ? 'top: -3px;' : 'bottom: -3px;'}"
+						></div>
+					</div>
+				</div>
+			{/if}
+		</div>
 	</div>
 {/if}
