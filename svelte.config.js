@@ -1,7 +1,7 @@
 import adapter from '@sveltejs/adapter-static';
 
 const dev = process.env.NODE_ENV !== 'production';
-const base = dev ? '' : process.env.BASE_PATH ?? '/budget';
+const base = dev ? '' : process.env.BASE_PATH ?? '/BudgetSparrow';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

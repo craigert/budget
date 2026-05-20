@@ -3,7 +3,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { defineConfig } from 'vite';
 
-const base = process.env.NODE_ENV === 'production' ? (process.env.BASE_PATH ?? '/budget') : '';
+const base = process.env.NODE_ENV === 'production' ? (process.env.BASE_PATH ?? '/BudgetSparrow') : '';
 
 export default defineConfig({
 	plugins: [
