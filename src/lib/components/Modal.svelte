@@ -26,12 +26,12 @@
 		tabindex="-1"
 	>
 		<div
-			class="w-full max-w-lg overflow-hidden rounded-t-2xl bg-white shadow-xl md:rounded-2xl dark:bg-slate-900"
+			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl md:rounded-2xl dark:bg-slate-900"
 			onclick={(e) => e.stopPropagation()}
 			role="document"
 			onkeydown={(e) => e.stopPropagation()}
 		>
-			<div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+			<div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
 				<h2 class="text-lg font-semibold">{title}</h2>
 				<button
 					type="button"
@@ -42,11 +42,11 @@
 					✕
 				</button>
 			</div>
-			<div class="px-5 py-4">
+			<div class="flex-1 overflow-y-auto px-5 py-4">
 				{@render children?.()}
 			</div>
 			{#if footer}
-				<div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3 dark:border-slate-800">
+				<div class="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-5 py-3 dark:border-slate-800">
 					{@render footer()}
 				</div>
 			{/if}
