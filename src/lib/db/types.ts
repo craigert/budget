@@ -31,7 +31,19 @@ export interface Transaction {
 	payee: string;
 	notes: string;
 	cleared: number; // 0 | 1
-	isBusiness: number; // 0 | 1
+	businessId: number | null;
+	/** @deprecated kept for v2 backward read compatibility; written rows use businessId only */
+	isBusiness?: number;
+	createdAt: number;
+}
+
+export interface Business {
+	id?: number;
+	name: string;
+	icon: string;
+	color: string;
+	archived: number;
+	sortOrder: number;
 	createdAt: number;
 }
 

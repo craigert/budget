@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Account, Category, Transaction, Budget, Setting } from './types';
+import type { Account, Business, Category, Transaction, Budget, Setting } from './types';
 
 export class BudgetDB extends Dexie {
 	accounts!: Table<Account, number>;
@@ -7,6 +7,7 @@ export class BudgetDB extends Dexie {
 	transactions!: Table<Transaction, number>;
 	budgets!: Table<Budget, number>;
 	settings!: Table<Setting, string>;
+	businesses!: Table<Business, number>;
 
 	constructor() {
 		super('budget');
@@ -42,6 +43,36 @@ export class BudgetDB extends Dexie {
 						(t.categoryId != null && businessCategoryIds.has(t.categoryId))
 							? 1
 							: 0;
+				});
+			});
+
+		// v3: multi-business support. New businesses table; transactions get
+		// businessId (FK). Migrate any isBusiness=1 rows into a "My Business"
+		// entity so the existing tagged set carries over.
+		this.version(3)
+			.stores({
+				businesses: '++id, name, archived, sortOrder, createdAt',
+				transactions:
+					'++id, date, accountId, categoryId, cleared, businessId, createdAt, [accountId+date], [categoryId+date]'
+			})
+			.upgrade(async (tx) => {
+				// Full-table scan: we can't query by isBusiness anymore (it's been
+				// dropped from the v3 index list), so peek at the raw stored fields.
+				const allRows = await tx.table('transactions').toArray();
+				const anyFlagged = allRows.some((t: Transaction) => t.isBusiness === 1);
+				let id: number | null = null;
+				if (anyFlagged) {
+					id = (await tx.table('businesses').add({
+						name: 'My Business',
+						icon: 'education/briefcase-01',
+						color: '#0f766e',
+						archived: 0,
+						sortOrder: 10,
+						createdAt: Date.now()
+					})) as number;
+				}
+				await tx.table('transactions').toCollection().modify((t: Transaction) => {
+					t.businessId = t.isBusiness === 1 && id !== null ? id : null;
 				});
 			});
 	}

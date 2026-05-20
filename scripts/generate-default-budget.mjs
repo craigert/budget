@@ -58,10 +58,16 @@ const TRAVEL_PAYEES = ['United Airlines', 'Marriott', 'Airbnb', 'Hertz Car Renta
 const BUSINESS_PAYEES = ['Adobe Subscription', 'GitHub Pro', 'AWS', 'Office Depot', 'Notion', 'Zoom', 'Figma', 'LinkedIn Premium', 'Domain Renewal'];
 
 const transactions = [];
+function isBusinessRow(account, category) {
+	const a = account.toLowerCase();
+	const c = category.toLowerCase();
+	return a.startsWith('business') || c === 'business expenses';
+}
 function add(date, account, category, amount, payee, notes = '') {
 	transactions.push({
 		Date: date,
 		Account: account,
+		Business: isBusinessRow(account, category) ? 'My Business' : '',
 		Type: amount < 0 ? 'Expense' : 'Income',
 		Category: category,
 		Payee: payee,
@@ -194,7 +200,7 @@ transactions.sort((a, b) => (a.Date < b.Date ? -1 : a.Date > b.Date ? 1 : 0));
 await mkdir(staticDir, { recursive: true });
 
 // --- CSV output ---
-const csvHeaders = ['Date', 'Account', 'Type', 'Category', 'Payee', 'Expense', 'Income', 'Notes'];
+const csvHeaders = ['Date', 'Account', 'Business', 'Type', 'Category', 'Payee', 'Expense', 'Income', 'Notes'];
 const escape = (s) =>
 	s == null || s === ''
 		? ''
@@ -212,7 +218,7 @@ const wb = XLSX.utils.book_new();
 const ws = XLSX.utils.json_to_sheet(transactions, { header: csvHeaders });
 // Column widths
 ws['!cols'] = [
-	{ wch: 12 }, { wch: 18 }, { wch: 9 }, { wch: 18 }, { wch: 22 },
+	{ wch: 12 }, { wch: 18 }, { wch: 15 }, { wch: 9 }, { wch: 18 }, { wch: 22 },
 	{ wch: 10 }, { wch: 10 }, { wch: 24 }
 ];
 XLSX.utils.book_append_sheet(wb, ws, 'Transactions');

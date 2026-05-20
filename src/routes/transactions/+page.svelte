@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
-	import type { Account, Category, Transaction } from '$lib/db/types';
+	import type { Account, Business, Category, Transaction } from '$lib/db/types';
 	import { money, formatDate, todayISO } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Modal from '$lib/components/Modal.svelte';
@@ -10,6 +10,10 @@
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
+	const businesses = live<Business[]>(
+		() => db.businesses.where('archived').equals(0).toArray(),
+		[]
+	);
 	const txs = live<Transaction[]>(
 		() => db.transactions.orderBy('date').reverse().toArray(),
 		[]
@@ -66,7 +70,7 @@
 		payee: '',
 		notes: '',
 		cleared: true,
-		isBusiness: false
+		businessId: null as number | null
 	});
 
 	function openCreate() {
@@ -80,7 +84,7 @@
 			payee: '',
 			notes: '',
 			cleared: true,
-			isBusiness: false
+			businessId: null
 		};
 		showModal = true;
 	}
@@ -96,7 +100,7 @@
 			payee: t.payee,
 			notes: t.notes,
 			cleared: t.cleared === 1,
-			isBusiness: t.isBusiness === 1
+			businessId: t.businessId ?? null
 		};
 		showModal = true;
 	}
@@ -113,7 +117,7 @@
 			payee: form.payee.trim(),
 			notes: form.notes.trim(),
 			cleared: form.cleared ? 1 : 0,
-			isBusiness: form.isBusiness ? 1 : 0
+			businessId: form.businessId
 		};
 		if (editing?.id) {
 			await db.transactions.update(editing.id, payload);
@@ -323,10 +327,15 @@
 			Cleared (transaction has posted)
 		</label>
 
-		<label class="flex items-center gap-2 text-sm">
-			<input type="checkbox" bind:checked={form.isBusiness} class="rounded" />
-			Business transaction
-		</label>
+		<div>
+			<label for="tx-biz" class="mb-1 block text-sm font-medium">Business</label>
+			<select id="tx-biz" bind:value={form.businessId} class="w-full">
+				<option value={null}>— None —</option>
+				{#each businesses.value as b (b.id)}
+					<option value={b.id}>{b.name}</option>
+				{/each}
+			</select>
+		</div>
 	</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (showModal = false)}>Cancel</Button>

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { db } from './index';
-import type { Account, AccountType, Category, CategoryKind, Transaction } from './types';
+import type { Account, AccountType, Business, Category, CategoryKind, Transaction } from './types';
 
 /**
  * Read a File (CSV or XLSX) and return CSV-shaped text suitable for importCSV.
@@ -93,7 +93,8 @@ const ALIASES: Record<string, string> = {
 	credit: 'income',
 	deposit: 'income',
 	notes: 'notes',
-	memo: 'notes'
+	memo: 'notes',
+	business: 'business'
 };
 
 function normalizeHeader(h: string) {
@@ -130,6 +131,7 @@ export interface CsvImportResult {
 	transactionsAdded: number;
 	accountsCreated: number;
 	categoriesCreated: number;
+	businessesCreated: number;
 	skipped: { row: number; reason: string }[];
 }
 
@@ -153,6 +155,7 @@ export async function importCSV(
 	const iIncome = idx('income');
 	const iAmount = idx('amount');
 	const iNotes = idx('notes');
+	const iBusiness = idx('business');
 
 	if (iDate < 0) throw new Error('CSV must include a Date column.');
 	if (iExpense < 0 && iIncome < 0 && iAmount < 0) {
@@ -163,26 +166,38 @@ export async function importCSV(
 		transactionsAdded: 0,
 		accountsCreated: 0,
 		categoriesCreated: 0,
+		businessesCreated: 0,
 		skipped: []
 	};
 
-	// === Phase 1: read existing accounts/categories OUTSIDE any transaction ===
-	const [existingAccounts, existingCategories] = await Promise.all([
+	// === Phase 1: read existing accounts/categories/businesses OUTSIDE any transaction ===
+	const [existingAccounts, existingCategories, existingBusinesses] = await Promise.all([
 		db.accounts.toArray(),
-		db.categories.toArray()
+		db.categories.toArray(),
+		db.businesses.toArray()
 	]);
 	const acctMap = new Map<string, number>();
 	for (const a of existingAccounts) if (a.id) acctMap.set(a.name.toLowerCase(), a.id);
 	const catMap = new Map<string, number>();
 	for (const c of existingCategories) if (c.id) catMap.set(c.name.toLowerCase(), c.id);
+	const bizMap = new Map<string, number>();
+	for (const b of existingBusinesses) if (b.id) bizMap.set(b.name.toLowerCase(), b.id);
 
 	// === Phase 2: pre-compute everything synchronously ===
-	// First pass: figure out what new accounts/categories need to be created.
 	const newAccounts: Account[] = [];
 	const newAccountNamesLower = new Set<string>();
 	const newCategories: Category[] = [];
 	const newCategoryKeys = new Set<string>(); // `${kind}:${nameLower}`
-	// Also pre-parse each row into a normalized form so we don't re-parse later.
+	const newBusinesses: Business[] = [];
+	const newBusinessNamesLower = new Set<string>();
+
+	const BIZ_PALETTE = ['#0f766e', '#16a34a', '#0ea5e9', '#a855f7', '#ec4899', '#f97316', '#eab308'];
+	function pickBizColor(name: string): string {
+		let h = 0;
+		for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+		return BIZ_PALETTE[Math.abs(h) % BIZ_PALETTE.length];
+	}
+
 	type ParsedRow = {
 		date: string;
 		amount: number; // signed
@@ -191,6 +206,7 @@ export async function importCSV(
 		kind: CategoryKind;
 		payee: string;
 		notes: string;
+		bizName: string; // '' if no explicit Business column value
 	};
 	const parsed: ParsedRow[] = [];
 
@@ -232,6 +248,7 @@ export async function importCSV(
 		if (typeRaw && kind === 'income' && amount < 0) amount = -amount;
 
 		const catName = iCategory >= 0 ? row[iCategory].trim() : '';
+		const bizName = iBusiness >= 0 ? row[iBusiness]?.trim() ?? '' : '';
 
 		// Stage account for creation if new
 		const acctLower = acctName.toLowerCase();
@@ -263,6 +280,22 @@ export async function importCSV(
 			}
 		}
 
+		// Stage business for creation if new
+		if (bizName) {
+			const bizLower = bizName.toLowerCase();
+			if (!bizMap.has(bizLower) && !newBusinessNamesLower.has(bizLower)) {
+				newBusinessNamesLower.add(bizLower);
+				newBusinesses.push({
+					name: bizName,
+					icon: 'education/briefcase-01',
+					color: pickBizColor(bizName),
+					archived: 0,
+					sortOrder: 500,
+					createdAt: Date.now()
+				} as Business);
+			}
+		}
+
 		parsed.push({
 			date,
 			amount: Math.round(amount * 100) / 100,
@@ -270,52 +303,75 @@ export async function importCSV(
 			catName,
 			kind,
 			payee: iPayee >= 0 ? row[iPayee]?.trim() ?? '' : '',
-			notes: iNotes >= 0 ? row[iNotes]?.trim() ?? '' : ''
+			notes: iNotes >= 0 ? row[iNotes]?.trim() ?? '' : '',
+			bizName
 		});
 	}
 
 	// === Phase 3: one transaction, only a handful of bulk operations ===
-	await db.transaction('rw', [db.accounts, db.categories, db.transactions], async () => {
-		if (mode === 'replace') {
-			await db.transactions.clear();
-		}
+	await db.transaction(
+		'rw',
+		[db.accounts, db.categories, db.transactions, db.businesses],
+		async () => {
+			if (mode === 'replace') {
+				await db.transactions.clear();
+			}
 
-		if (newAccounts.length) {
-			const ids = (await db.accounts.bulkAdd(newAccounts, { allKeys: true })) as number[];
-			newAccounts.forEach((a, i) => acctMap.set(a.name.toLowerCase(), ids[i]));
-			result.accountsCreated = newAccounts.length;
-		}
+			if (newAccounts.length) {
+				const ids = (await db.accounts.bulkAdd(newAccounts, { allKeys: true })) as number[];
+				newAccounts.forEach((a, i) => acctMap.set(a.name.toLowerCase(), ids[i]));
+				result.accountsCreated = newAccounts.length;
+			}
 
-		if (newCategories.length) {
-			const ids = (await db.categories.bulkAdd(newCategories, { allKeys: true })) as number[];
-			newCategories.forEach((c, i) => catMap.set(c.name.toLowerCase(), ids[i]));
-			result.categoriesCreated = newCategories.length;
-		}
+			if (newCategories.length) {
+				const ids = (await db.categories.bulkAdd(newCategories, { allKeys: true })) as number[];
+				newCategories.forEach((c, i) => catMap.set(c.name.toLowerCase(), ids[i]));
+				result.categoriesCreated = newCategories.length;
+			}
 
-		// Build the transaction inserts now that maps are fully populated
-		const inserts: Transaction[] = parsed.map((p) => {
-			const acctLower = p.acctName.toLowerCase();
-			const catLower = p.catName.toLowerCase();
-			const isBusiness =
-				acctLower.startsWith('business') || catLower === 'business expenses' ? 1 : 0;
-			return {
-				date: p.date,
-				accountId: acctMap.get(acctLower)!,
-				categoryId: p.catName ? catMap.get(catLower) ?? null : null,
-				amount: p.amount,
-				payee: p.payee,
-				notes: p.notes,
-				cleared: 1,
-				isBusiness,
-				createdAt: Date.parse(p.date) || Date.now()
-			} as Transaction;
-		});
+			if (newBusinesses.length) {
+				const ids = (await db.businesses.bulkAdd(newBusinesses, { allKeys: true })) as number[];
+				newBusinesses.forEach((b, i) => bizMap.set(b.name.toLowerCase(), ids[i]));
+				result.businessesCreated = newBusinesses.length;
+			}
 
-		if (inserts.length) {
-			await db.transactions.bulkAdd(inserts);
-			result.transactionsAdded = inserts.length;
+			// Build the transaction inserts now that maps are fully populated.
+			// businessId precedence:
+			//   1. Explicit "Business" column value → look up / auto-created id
+			//   2. Else if a single business exists, fall back to it for legacy
+			//      auto-tagging (Account starts with "Business" or Category =
+			//      "Business expenses")
+			//   3. Else null
+			const onlyBusinessId = bizMap.size === 1 ? Array.from(bizMap.values())[0] : null;
+
+			const inserts: Transaction[] = parsed.map((p) => {
+				const acctLower = p.acctName.toLowerCase();
+				const catLower = p.catName.toLowerCase();
+				let businessId: number | null = null;
+				if (p.bizName) {
+					businessId = bizMap.get(p.bizName.toLowerCase()) ?? null;
+				} else if (acctLower.startsWith('business') || catLower === 'business expenses') {
+					businessId = onlyBusinessId;
+				}
+				return {
+					date: p.date,
+					accountId: acctMap.get(acctLower)!,
+					categoryId: p.catName ? catMap.get(catLower) ?? null : null,
+					amount: p.amount,
+					payee: p.payee,
+					notes: p.notes,
+					cleared: 1,
+					businessId,
+					createdAt: Date.parse(p.date) || Date.now()
+				} as Transaction;
+			});
+
+			if (inserts.length) {
+				await db.transactions.bulkAdd(inserts);
+				result.transactionsAdded = inserts.length;
+			}
 		}
-	});
+	);
 
 	return result;
 }
