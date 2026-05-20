@@ -11,6 +11,7 @@
 		{ href: '/budgets', label: 'Budgets', icon: NAV_ICONS.budgets },
 		{ href: '/accounts', label: 'Accounts', icon: NAV_ICONS.accounts },
 		{ href: '/business', label: 'Business', icon: NAV_ICONS.business },
+		{ href: '/taxes', label: 'Taxes', icon: NAV_ICONS.taxes },
 		{ href: '/settings', label: 'Settings', icon: NAV_ICONS.settings }
 	];
 

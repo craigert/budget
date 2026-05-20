@@ -122,5 +122,6 @@ export const NAV_ICONS = {
 	budgets: 'charts/bar-chart-03',
 	accounts: 'finance-ecommerce/wallet',
 	business: 'education/briefcase-01',
+	taxes: 'finance-ecommerce/scales',
 	settings: 'general/settings-01'
 } as const;

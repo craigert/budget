@@ -47,6 +47,30 @@ export interface Business {
 	createdAt: number;
 }
 
+export type MileageKind = 'business' | 'medical' | 'charity';
+
+export interface Mileage {
+	id?: number;
+	date: string; // YYYY-MM-DD
+	miles: number;
+	kind: MileageKind;
+	purpose: string; // free text — destination / reason
+	businessId: number | null; // optional link to a Business (for business miles)
+	notes: string;
+	createdAt: number;
+}
+
+/** IRS standard mileage rates by year. Keep current; update each January. */
+export const MILEAGE_RATES: Record<number, Record<MileageKind, number>> = {
+	2024: { business: 0.67, medical: 0.21, charity: 0.14 },
+	2025: { business: 0.70, medical: 0.21, charity: 0.14 },
+	2026: { business: 0.70, medical: 0.21, charity: 0.14 }
+};
+
+export function mileageRate(year: number, kind: MileageKind): number {
+	return (MILEAGE_RATES[year] ?? MILEAGE_RATES[2026])[kind];
+}
+
 export interface Budget {
 	id?: number;
 	categoryId: number;

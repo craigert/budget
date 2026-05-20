@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Account, Business, Category, Transaction, Budget, Setting } from './types';
+import type { Account, Business, Category, Mileage, Transaction, Budget, Setting } from './types';
 
 export class BudgetDB extends Dexie {
 	accounts!: Table<Account, number>;
@@ -8,6 +8,7 @@ export class BudgetDB extends Dexie {
 	budgets!: Table<Budget, number>;
 	settings!: Table<Setting, string>;
 	businesses!: Table<Business, number>;
+	mileage!: Table<Mileage, number>;
 
 	constructor() {
 		super('budget');
@@ -75,6 +76,11 @@ export class BudgetDB extends Dexie {
 					t.businessId = t.isBusiness === 1 && id !== null ? id : null;
 				});
 			});
+
+		// v4: mileage logs for tax dashboard
+		this.version(4).stores({
+			mileage: '++id, date, kind, businessId, createdAt'
+		});
 	}
 }
 

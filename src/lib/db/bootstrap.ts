@@ -2,6 +2,26 @@ import { base } from '$app/paths';
 import { db } from './index';
 import { seedIfEmpty } from './seed';
 import { importCSV } from './csv';
+import type { Category } from './types';
+
+/**
+ * Tax-relevant categories added in v3-era. Make sure they exist for users
+ * whose DB was seeded before they were introduced.
+ */
+const ENSURE_CATEGORIES: Omit<Category, 'id'>[] = [
+	{ name: 'Mortgage Interest', kind: 'expense', icon: 'general/home', color: '#0369a1', archived: 0, sortOrder: 160 },
+	{ name: 'Charity', kind: 'expense', icon: 'general/heart-hand', color: '#dc2626', archived: 0, sortOrder: 170 },
+	{ name: 'Taxes Paid', kind: 'expense', icon: 'finance-ecommerce/scales', color: '#475569', archived: 0, sortOrder: 180 }
+];
+
+async function ensureDefaultCategories() {
+	const existing = await db.categories.toArray();
+	const existingNames = new Set(existing.map((c) => c.name.toLowerCase()));
+	const toAdd = ENSURE_CATEGORIES.filter((c) => !existingNames.has(c.name.toLowerCase()));
+	if (toAdd.length) {
+		await db.categories.bulkAdd(toAdd as Category[]);
+	}
+}
 
 async function tryFetchSpreadsheet(url: string, kind: 'csv' | 'xlsx'): Promise<string | null> {
 	try {
@@ -39,7 +59,12 @@ async function tryFetchDefaultSpreadsheet(): Promise<string | null> {
  */
 export async function bootstrap() {
 	const before = await db.settings.get('seeded');
-	if (before?.value) return { autoImported: false, freshSeed: false };
+	if (before?.value) {
+		// Already seeded — still backfill any new default categories that
+		// have shipped since the user first set up the app.
+		await ensureDefaultCategories();
+		return { autoImported: false, freshSeed: false };
+	}
 
 	await seedIfEmpty();
 

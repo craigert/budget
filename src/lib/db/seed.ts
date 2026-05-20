@@ -18,6 +18,9 @@ const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
 	{ name: 'Insurance', kind: 'expense', icon: 'security/shield-tick', color: '#64748b', archived: 0, sortOrder: 130 },
 	{ name: 'Fees', kind: 'expense', icon: 'finance-ecommerce/credit-card', color: '#737373', archived: 0, sortOrder: 140 },
 	{ name: 'Business expenses', kind: 'expense', icon: 'education/briefcase-02', color: '#0f766e', archived: 0, sortOrder: 150 },
+	{ name: 'Mortgage Interest', kind: 'expense', icon: 'general/home', color: '#0369a1', archived: 0, sortOrder: 160 },
+	{ name: 'Charity', kind: 'expense', icon: 'general/heart-hand', color: '#dc2626', archived: 0, sortOrder: 170 },
+	{ name: 'Taxes Paid', kind: 'expense', icon: 'finance-ecommerce/scales', color: '#475569', archived: 0, sortOrder: 180 },
 	{ name: 'Other expense', kind: 'expense', icon: 'finance-ecommerce/coins-01', color: '#94a3b8', archived: 0, sortOrder: 999 },
 	// income
 	{ name: 'Salary', kind: 'income', icon: 'education/briefcase-01', color: '#22c55e', archived: 0, sortOrder: 10 },

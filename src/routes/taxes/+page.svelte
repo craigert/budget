@@ -1,0 +1,706 @@
+<script lang="ts">
+	import { db } from '$lib/db';
+	import { live } from '$lib/db/live.svelte';
+	import type {
+		Account,
+		Business,
+		Category,
+		Mileage,
+		MileageKind,
+		Transaction
+	} from '$lib/db/types';
+	import { mileageRate } from '$lib/db/types';
+	import { money, formatDate } from '$lib/utils/format';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Button from '$lib/components/Button.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+
+	const today = new Date('2026-05-20T00:00:00Z');
+	let year = $state(today.getUTCFullYear());
+
+	const yearStart = $derived(`${year}-01-01`);
+	const yearEnd = $derived(`${year}-12-31`);
+
+	const txs = live<Transaction[]>(
+		() =>
+			db.transactions
+				.toArray()
+				.then((arr) => arr.filter((t) => t.date >= yearStart && t.date <= yearEnd)),
+		[]
+	);
+	const businesses = live<Business[]>(
+		() => db.businesses.where('archived').equals(0).toArray(),
+		[]
+	);
+	const categories = live<Category[]>(() => db.categories.toArray(), []);
+	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
+	const mileageLogs = live<Mileage[]>(
+		() =>
+			db.mileage
+				.toArray()
+				.then((arr) =>
+					arr
+						.filter((m) => m.date >= yearStart && m.date <= yearEnd)
+						.sort((a, b) => (a.date < b.date ? 1 : -1))
+				),
+		[]
+	);
+
+	const categoryMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
+	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
+	const businessMap = $derived(new Map(businesses.value.map((b) => [b.id!, b])));
+
+	function categoryByName(name: string): Category | undefined {
+		return categories.value.find((c) => c.name.toLowerCase() === name.toLowerCase());
+	}
+	function txInCategory(name: string): Transaction[] {
+		const c = categoryByName(name);
+		if (!c) return [];
+		return txs.value.filter((t) => t.categoryId === c.id);
+	}
+	const sumAbs = (arr: Transaction[]) => arr.reduce((s, t) => s + Math.abs(t.amount), 0);
+	const sumExpenses = (arr: Transaction[]) => arr.filter((t) => t.amount < 0).reduce((s, t) => s + -t.amount, 0);
+	const sumIncome = (arr: Transaction[]) => arr.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+
+	// === Schedule C per business ===
+	const businessSummary = $derived.by(() => {
+		return businesses.value.map((b) => {
+			const rows = txs.value.filter((t) => t.businessId === b.id);
+			const income = sumIncome(rows);
+			const expense = sumExpenses(rows);
+			const byCat = new Map<number | null, number>();
+			for (const t of rows.filter((t) => t.amount < 0)) {
+				byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + -t.amount);
+			}
+			const categoryRows = Array.from(byCat.entries())
+				.map(([categoryId, amount]) => ({
+					categoryId,
+					categoryName: categoryId != null ? categoryMap.get(categoryId)?.name ?? 'Uncategorized' : 'Uncategorized',
+					amount
+				}))
+				.sort((a, b) => b.amount - a.amount);
+			return { business: b, income, expense, profit: income - expense, rows, categoryRows };
+		});
+	});
+
+	// === Charity (Schedule A line 11) ===
+	const charityTxs = $derived.by(() => {
+		const c = categoryByName('Charity');
+		const explicit = c ? txs.value.filter((t) => t.categoryId === c.id) : [];
+		// Also catch transactions whose payee/notes look charitable, even if categorized otherwise
+		const looksLike = txs.value.filter((t) => {
+			if (c && t.categoryId === c.id) return false;
+			const blob = `${t.payee} ${t.notes}`.toLowerCase();
+			return /\b(donat|charit|tithe|nonprofit|foundation|church|goodwill|salvation army|red cross|unicef)\b/.test(blob);
+		});
+		return [...explicit, ...looksLike].filter((t) => t.amount < 0);
+	});
+	const charityTotal = $derived(sumAbs(charityTxs));
+
+	// === Medical (Schedule A — only amount over 7.5% of AGI is deductible) ===
+	const medicalTxs = $derived(txInCategory('Health').filter((t) => t.amount < 0));
+	const medicalTotal = $derived(sumAbs(medicalTxs));
+
+	// === SALT — State + local + property + sales taxes, capped at $10k ===
+	const saltTxs = $derived.by(() => {
+		const taxesPaid = categoryByName('Taxes Paid');
+		const fees = categoryByName('Fees');
+		// Anything tagged "Taxes Paid", OR Fees-category transactions whose payee
+		// matches state/local tax / treasury / department of revenue patterns.
+		const direct = taxesPaid ? txs.value.filter((t) => t.categoryId === taxesPaid.id) : [];
+		const heur = (fees ? txs.value.filter((t) => t.categoryId === fees.id) : []).filter((t) => {
+			const blob = `${t.payee} ${t.notes}`.toLowerCase();
+			return /\b(state|treasury|department of revenue|tax board|property tax|county tax|sales tax)\b/.test(blob);
+		});
+		return [...direct, ...heur].filter((t) => t.amount < 0);
+	});
+	const saltTotal = $derived(sumAbs(saltTxs));
+	const saltDeductible = $derived(Math.min(saltTotal, 10000));
+
+	// === Mortgage interest ===
+	const mortgageTxs = $derived.by(() => {
+		const mi = categoryByName('Mortgage Interest');
+		const direct = mi ? txs.value.filter((t) => t.categoryId === mi.id) : [];
+		// Also surface transactions in Rent/Mortgage whose notes mention "interest"
+		const rentMortgage = categoryByName('Rent / Mortgage');
+		const heur = (rentMortgage ? txs.value.filter((t) => t.categoryId === rentMortgage.id) : []).filter((t) => /\binterest\b/i.test(`${t.payee} ${t.notes}`));
+		return [...direct, ...heur].filter((t) => t.amount < 0);
+	});
+	const mortgageTotal = $derived(sumAbs(mortgageTxs));
+
+	// === Estimated tax payments (Q1-Q4) ===
+	const estimatedTaxTxs = $derived.by(() => {
+		// Payee looks federal IRS-y OR state-tax-y, in Fees or Taxes Paid category
+		const tp = categoryByName('Taxes Paid');
+		const fees = categoryByName('Fees');
+		const candidates = txs.value.filter((t) => t.amount < 0 && (
+			(tp && t.categoryId === tp.id) || (fees && t.categoryId === fees.id)
+		));
+		return candidates.filter((t) => /\b(irs|estimated|treasury|state tax|department of revenue)\b/i.test(`${t.payee} ${t.notes}`));
+	});
+	function quarterOf(date: string): 1 | 2 | 3 | 4 {
+		const m = Number(date.slice(5, 7));
+		if (m <= 3) return 1;
+		if (m <= 6) return 2;
+		if (m <= 9) return 3;
+		return 4;
+	}
+	const quarterlyTotals = $derived.by(() => {
+		const buckets: Record<1 | 2 | 3 | 4, Transaction[]> = { 1: [], 2: [], 3: [], 4: [] };
+		for (const t of estimatedTaxTxs) buckets[quarterOf(t.date)].push(t);
+		return buckets;
+	});
+	const estimatedTaxTotal = $derived(sumAbs(estimatedTaxTxs));
+
+	// === Mileage ===
+	const mileageBuckets = $derived.by(() => {
+		const buckets: Record<MileageKind, { miles: number; deduction: number; logs: Mileage[] }> = {
+			business: { miles: 0, deduction: 0, logs: [] },
+			medical: { miles: 0, deduction: 0, logs: [] },
+			charity: { miles: 0, deduction: 0, logs: [] }
+		};
+		for (const m of mileageLogs.value) {
+			const b = buckets[m.kind];
+			b.miles += m.miles;
+			b.deduction += m.miles * mileageRate(year, m.kind);
+			b.logs.push(m);
+		}
+		return buckets;
+	});
+	const mileageTotalDeduction = $derived(
+		mileageBuckets.business.deduction +
+			mileageBuckets.medical.deduction +
+			mileageBuckets.charity.deduction
+	);
+
+	// === AGI (user-supplied, persisted to settings) ===
+	let agi = $state(0);
+	$effect(() => {
+		(async () => {
+			const v = await db.settings.get(`agi_${year}`);
+			agi = typeof v?.value === 'number' ? v.value : 0;
+		})();
+	});
+	let agiInput = $state('');
+	$effect(() => {
+		agiInput = agi > 0 ? String(agi) : '';
+	});
+	async function saveAGI() {
+		const n = Number(agiInput) || 0;
+		agi = n;
+		await db.settings.put({ key: `agi_${year}`, value: n });
+	}
+	const medicalThreshold = $derived(agi > 0 ? agi * 0.075 : 0);
+	const medicalDeductible = $derived(agi > 0 ? Math.max(0, medicalTotal - medicalThreshold) : 0);
+
+	// === Drilldown expansion state ===
+	let expanded = $state<Set<string>>(new Set());
+	function toggleExpand(key: string) {
+		const next = new Set(expanded);
+		if (next.has(key)) next.delete(key);
+		else next.add(key);
+		expanded = next;
+	}
+	const isOpen = (key: string) => expanded.has(key);
+
+	// === Mileage quick-add form ===
+	let showMileageForm = $state(false);
+	let mileageForm = $state({
+		date: today.toISOString().slice(0, 10),
+		miles: 0,
+		kind: 'business' as MileageKind,
+		purpose: '',
+		businessId: null as number | null,
+		notes: ''
+	});
+	function openMileageForm() {
+		mileageForm = {
+			date: today.toISOString().slice(0, 10),
+			miles: 0,
+			kind: 'business',
+			purpose: '',
+			businessId: businesses.value[0]?.id ?? null,
+			notes: ''
+		};
+		showMileageForm = true;
+	}
+	async function saveMileage(e: Event) {
+		e.preventDefault();
+		if (mileageForm.miles <= 0) return;
+		await db.mileage.add({
+			date: mileageForm.date,
+			miles: Number(mileageForm.miles) || 0,
+			kind: mileageForm.kind,
+			purpose: mileageForm.purpose.trim(),
+			businessId: mileageForm.kind === 'business' ? mileageForm.businessId : null,
+			notes: mileageForm.notes.trim(),
+			createdAt: Date.now()
+		} as Mileage);
+		showMileageForm = false;
+	}
+	async function deleteMileage(m: Mileage) {
+		if (!m.id) return;
+		if (!confirm(`Delete mileage entry: ${m.miles} mi on ${m.date}?`)) return;
+		await db.mileage.delete(m.id);
+	}
+
+	// === Year availability — based on any data in DB ===
+	const availableYears = $derived.by(() => {
+		const set = new Set<number>([year]);
+		// Add current + previous 2 years as defaults
+		set.add(today.getUTCFullYear());
+		set.add(today.getUTCFullYear() - 1);
+		set.add(today.getUTCFullYear() - 2);
+		return Array.from(set).sort((a, b) => b - a);
+	});
+
+	function renderTxRow(t: Transaction) {
+		const cat = t.categoryId != null ? categoryMap.get(t.categoryId) : null;
+		const acct = accountMap.get(t.accountId);
+		return { cat, acct };
+	}
+</script>
+
+<PageHeader title="Taxes" subtitle="Year-end summary for FreeTaxUSA — {year}">
+	{#snippet actions()}
+		<select
+			class="text-sm"
+			value={year}
+			onchange={(e) => (year = Number((e.currentTarget as HTMLSelectElement).value))}
+			aria-label="Tax year"
+		>
+			{#each availableYears as y (y)}
+				<option value={y}>{y}</option>
+			{/each}
+		</select>
+	{/snippet}
+</PageHeader>
+
+<div class="space-y-6 p-4 md:p-8">
+	<!-- Schedule C per business -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-4 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">Schedule C — Self-employment</h2>
+				<p class="mt-1 text-xs text-slate-500">Per business: income, deductible expenses, and net profit. Plug each business into a separate Schedule C in FreeTaxUSA.</p>
+			</div>
+		</div>
+		{#if businessSummary.length === 0}
+			<p class="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">
+				No businesses set up. Add one on the <a class="text-brand-600 underline" href="/business">Business page</a>.
+			</p>
+		{:else}
+			<div class="space-y-4">
+				{#each businessSummary as b (b.business.id)}
+					{@const key = `biz-${b.business.id}`}
+					<div class="rounded-lg border border-slate-200 dark:border-slate-800">
+						<div class="flex items-center gap-3 px-4 py-3">
+							<div class="flex h-9 w-9 items-center justify-center rounded-full" style="background:{b.business.color}22;color:{b.business.color}">
+								<Icon name={b.business.icon} size={18} />
+							</div>
+							<div class="flex-1">
+								<div class="font-medium">{b.business.name}</div>
+								<div class="text-xs text-slate-500">{b.rows.length} transactions this year</div>
+							</div>
+							<div class="grid grid-cols-3 gap-3 text-right">
+								<div>
+									<div class="section-label">Income</div>
+									<div class="tabular-nums text-brand-500">{money(b.income)}</div>
+								</div>
+								<div>
+									<div class="section-label">Expenses</div>
+									<div class="tabular-nums">{money(b.expense)}</div>
+								</div>
+								<div>
+									<div class="section-label">Net</div>
+									<div class="tabular-nums font-semibold {b.profit < 0 ? 'text-red-600' : ''}">{money(b.profit)}</div>
+								</div>
+							</div>
+							<button
+								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+								onclick={() => toggleExpand(key)}
+								aria-label={isOpen(key) ? 'Collapse' : 'Expand'}
+							>
+								{isOpen(key) ? '−' : '+'}
+							</button>
+						</div>
+						{#if isOpen(key)}
+							<div class="border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+								<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Expenses by category</div>
+								<ul class="mb-4 divide-y divide-slate-100 dark:divide-slate-800">
+									{#each b.categoryRows as row (row.categoryId)}
+										<li class="flex items-center justify-between py-1.5 text-sm">
+											<span>{row.categoryName}</span>
+											<span class="tabular-nums">{money(row.amount)}</span>
+										</li>
+									{/each}
+								</ul>
+								<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">All transactions</div>
+								<ul class="max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+									{#each b.rows.slice(0, 100) as t (t.id)}
+										{@const r = renderTxRow(t)}
+										<li class="flex items-center gap-2 px-2 py-1.5 text-xs">
+											<span class="w-20 shrink-0 text-slate-500">{t.date}</span>
+											<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+											<span class="w-28 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+											<span class="w-20 shrink-0 text-right tabular-nums {t.amount > 0 ? 'text-brand-500' : ''}">{money(t.amount)}</span>
+										</li>
+									{/each}
+									{#if b.rows.length > 100}
+										<li class="px-2 py-2 text-center text-xs text-slate-500">Showing first 100 of {b.rows.length}</li>
+									{/if}
+								</ul>
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</section>
+
+	<!-- Mileage -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-4 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">Mileage deduction</h2>
+				<p class="mt-1 text-xs text-slate-500">
+					{year} IRS standard rates: business {(mileageRate(year, 'business') * 100).toFixed(0)}¢/mi · medical {(mileageRate(year, 'medical') * 100).toFixed(0)}¢/mi · charity {(mileageRate(year, 'charity') * 100).toFixed(0)}¢/mi
+				</p>
+			</div>
+			<Button size="sm" onclick={openMileageForm}>+ Log miles</Button>
+		</div>
+		<div class="grid gap-3 sm:grid-cols-3">
+			{#each ['business', 'medical', 'charity'] as const as kind (kind)}
+				{@const b = mileageBuckets[kind]}
+				{@const key = `mileage-${kind}`}
+				<div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+					<div class="section-label capitalize">{kind} miles</div>
+					<div class="mt-1 text-2xl font-semibold tabular-nums">{b.miles.toLocaleString()}</div>
+					<div class="mt-1 text-sm text-slate-500 tabular-nums">{money(b.deduction)} deduction</div>
+					{#if b.logs.length > 0}
+						<button class="mt-2 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand(key)}>
+							{isOpen(key) ? 'Hide' : 'Show'} {b.logs.length} entries
+						</button>
+						{#if isOpen(key)}
+							<ul class="mt-2 max-h-40 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+								{#each b.logs as m (m.id)}
+									<li class="flex items-center gap-2 px-2 py-1 text-xs">
+										<span class="w-20 shrink-0 text-slate-500">{m.date}</span>
+										<span class="flex-1 truncate">{m.purpose || '(no purpose)'}</span>
+										<span class="w-14 shrink-0 text-right tabular-nums">{m.miles.toLocaleString()} mi</span>
+										<button class="text-slate-400 hover:text-red-600" onclick={() => deleteMileage(m)} aria-label="Delete">×</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/each}
+		</div>
+		<div class="mt-3 rounded-md bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+			Total mileage deduction · {money(mileageTotalDeduction)}
+		</div>
+	</section>
+
+	<!-- Charity -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-3 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">Charitable contributions</h2>
+				<p class="mt-1 text-xs text-slate-500">Schedule A, line 11. Single donations ≥ $250 need written acknowledgment from the charity.</p>
+			</div>
+			<div class="text-right">
+				<div class="text-2xl font-semibold tabular-nums">{money(charityTotal)}</div>
+				<div class="text-xs text-slate-500">{charityTxs.length} donation(s)</div>
+			</div>
+		</div>
+		{#if charityTxs.length > 0}
+			<button class="text-xs text-brand-600 hover:underline" onclick={() => toggleExpand('charity')}>
+				{isOpen('charity') ? 'Hide' : 'Show'} transactions
+			</button>
+			{#if isOpen('charity')}
+				<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+					{#each charityTxs as t (t.id)}
+						{@const r = renderTxRow(t)}
+						{@const flag = -t.amount >= 250}
+						<li class="flex items-center gap-2 px-3 py-1.5 text-sm">
+							<span class="w-24 shrink-0 text-slate-500">{formatDate(t.date)}</span>
+							<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+							<span class="w-24 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+							<span class="w-24 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
+							{#if flag}
+								<span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" title="Donations ≥ $250 require written acknowledgment">≥$250</span>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{:else}
+			<p class="text-sm text-slate-500">No charitable donations detected for {year}.</p>
+		{/if}
+	</section>
+
+	<!-- Medical -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-3 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">Medical expenses</h2>
+				<p class="mt-1 text-xs text-slate-500">Schedule A, line 4. Only the amount exceeding 7.5% of AGI is deductible.</p>
+			</div>
+			<div class="text-right">
+				<div class="text-2xl font-semibold tabular-nums">{money(medicalTotal)}</div>
+				<div class="text-xs text-slate-500">{medicalTxs.length} transaction(s)</div>
+			</div>
+		</div>
+		<div class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+			<div>
+				<label for="agi" class="mb-1 block text-xs font-medium">Your {year} Adjusted Gross Income (AGI)</label>
+				<input
+					id="agi"
+					type="number"
+					inputmode="decimal"
+					step="100"
+					min="0"
+					bind:value={agiInput}
+					onblur={saveAGI}
+					placeholder="Enter AGI to compute the deductible portion"
+					class="w-full"
+				/>
+			</div>
+			<div class="text-xs text-slate-500">
+				{#if agi > 0}
+					7.5% threshold: <span class="font-medium tabular-nums">{money(medicalThreshold)}</span>
+				{:else}
+					Enter AGI →
+				{/if}
+			</div>
+		</div>
+		{#if agi > 0}
+			{@const pct = Math.min(100, (medicalTotal / Math.max(1, medicalThreshold)) * 100)}
+			<div class="mt-3">
+				<div class="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+					<div class="h-full {medicalTotal >= medicalThreshold ? 'bg-brand-500' : 'bg-amber-400'}" style="width:{pct}%"></div>
+				</div>
+				<div class="mt-1.5 flex justify-between text-xs">
+					<span class="text-slate-500">{money(medicalTotal)} / {money(medicalThreshold)} threshold</span>
+					<span class="font-semibold {medicalDeductible > 0 ? 'text-brand-600' : 'text-slate-500'}">
+						Deductible: {money(medicalDeductible)}
+					</span>
+				</div>
+			</div>
+		{/if}
+		{#if medicalTxs.length > 0}
+			<button class="mt-3 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand('medical')}>
+				{isOpen('medical') ? 'Hide' : 'Show'} transactions
+			</button>
+			{#if isOpen('medical')}
+				<ul class="mt-2 max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+					{#each medicalTxs.slice(0, 200) as t (t.id)}
+						{@const r = renderTxRow(t)}
+						<li class="flex items-center gap-2 px-3 py-1.5 text-sm">
+							<span class="w-24 shrink-0 text-slate-500">{formatDate(t.date)}</span>
+							<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+							<span class="w-24 shrink-0 truncate text-slate-500">{r.acct?.name ?? ''}</span>
+							<span class="w-24 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</section>
+
+	<!-- SALT -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-3 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">State &amp; local taxes (SALT)</h2>
+				<p class="mt-1 text-xs text-slate-500">Schedule A, lines 5–7. State + local income or sales + property + personal property taxes. Capped at $10,000.</p>
+			</div>
+			<div class="text-right">
+				<div class="text-2xl font-semibold tabular-nums">{money(saltTotal)}</div>
+				<div class="text-xs text-slate-500">{saltTxs.length} payment(s)</div>
+			</div>
+		</div>
+		<div>
+			<div class="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+				<div class="h-full {saltTotal >= 10000 ? 'bg-red-500' : 'bg-brand-500'}" style="width:{Math.min(100, (saltTotal / 10000) * 100)}%"></div>
+			</div>
+			<div class="mt-1.5 flex justify-between text-xs">
+				<span class="text-slate-500">{money(saltTotal)} of $10,000 cap</span>
+				<span class="font-semibold text-brand-600">Deductible: {money(saltDeductible)}</span>
+			</div>
+		</div>
+		{#if saltTxs.length > 0}
+			<button class="mt-3 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand('salt')}>
+				{isOpen('salt') ? 'Hide' : 'Show'} transactions
+			</button>
+			{#if isOpen('salt')}
+				<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+					{#each saltTxs as t (t.id)}
+						{@const r = renderTxRow(t)}
+						<li class="flex items-center gap-2 px-3 py-1.5 text-sm">
+							<span class="w-24 shrink-0 text-slate-500">{formatDate(t.date)}</span>
+							<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+							<span class="w-24 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+							<span class="w-24 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</section>
+
+	<!-- Mortgage interest -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-3 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">Mortgage interest paid</h2>
+				<p class="mt-1 text-xs text-slate-500">Schedule A, line 8. Use the interest portion of your mortgage payments — your lender's 1098 has the exact figure.</p>
+			</div>
+			<div class="text-right">
+				<div class="text-2xl font-semibold tabular-nums">{money(mortgageTotal)}</div>
+				<div class="text-xs text-slate-500">{mortgageTxs.length} payment(s)</div>
+			</div>
+		</div>
+		{#if mortgageTxs.length > 0}
+			<button class="text-xs text-brand-600 hover:underline" onclick={() => toggleExpand('mortgage')}>
+				{isOpen('mortgage') ? 'Hide' : 'Show'} transactions
+			</button>
+			{#if isOpen('mortgage')}
+				<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+					{#each mortgageTxs as t (t.id)}
+						{@const r = renderTxRow(t)}
+						<li class="flex items-center gap-2 px-3 py-1.5 text-sm">
+							<span class="w-24 shrink-0 text-slate-500">{formatDate(t.date)}</span>
+							<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+							<span class="w-24 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+							<span class="w-24 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{:else}
+			<p class="text-sm text-slate-500">
+				No mortgage-interest payments tagged for {year}. Tag relevant payments with the
+				<strong>Mortgage Interest</strong> category to populate this section.
+			</p>
+		{/if}
+	</section>
+
+	<!-- Estimated tax payments -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-3 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">Estimated tax payments</h2>
+				<p class="mt-1 text-xs text-slate-500">Quarterly federal and state estimated taxes paid. Plug each Q's total into Form 1040 line 26 (federal) and the state equivalent.</p>
+			</div>
+			<div class="text-right">
+				<div class="text-2xl font-semibold tabular-nums">{money(estimatedTaxTotal)}</div>
+				<div class="text-xs text-slate-500">{estimatedTaxTxs.length} payment(s)</div>
+			</div>
+		</div>
+		<div class="grid gap-3 sm:grid-cols-4">
+			{#each [1, 2, 3, 4] as const as q (q)}
+				{@const key = `eq-${q}`}
+				{@const rows = quarterlyTotals[q]}
+				{@const total = sumAbs(rows)}
+				<div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+					<div class="section-label">Q{q}</div>
+					<div class="mt-1 text-xl font-semibold tabular-nums">{money(total)}</div>
+					<div class="mt-0.5 text-xs text-slate-500">{rows.length} payment(s)</div>
+					{#if rows.length > 0}
+						<button class="mt-1 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand(key)}>
+							{isOpen(key) ? 'Hide' : 'Show'}
+						</button>
+						{#if isOpen(key)}
+							<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+								{#each rows as t (t.id)}
+									<li class="flex items-center gap-2 px-2 py-1 text-xs">
+										<span class="w-16 shrink-0 text-slate-500">{t.date}</span>
+										<span class="flex-1 truncate">{t.payee}</span>
+										<span class="shrink-0 tabular-nums">{money(t.amount)}</span>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/each}
+		</div>
+	</section>
+
+	<!-- FreeTaxUSA handoff banner -->
+	<section class="rounded-xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10">
+		<h2 class="text-lg font-semibold text-brand-700 dark:text-brand-200">Ready for FreeTaxUSA</h2>
+		<p class="mt-1 text-sm text-brand-700/80 dark:text-brand-200/80">
+			Type the numbers above into the matching screens in FreeTaxUSA. Tip: open this page in one window and your tax return in another.
+		</p>
+	</section>
+</div>
+
+<!-- Mileage quick-add modal -->
+{#if showMileageForm}
+	<div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" onclick={() => (showMileageForm = false)} onkeydown={(e) => e.key === 'Escape' && (showMileageForm = false)} tabindex="-1">
+		<div class="w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-xl md:rounded-2xl dark:bg-slate-900" onclick={(e) => e.stopPropagation()} role="document" onkeydown={(e) => e.stopPropagation()}>
+			<div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+				<h2 class="text-lg font-semibold">Log miles</h2>
+				<button type="button" onclick={() => (showMileageForm = false)} class="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close">✕</button>
+			</div>
+			<form onsubmit={saveMileage} class="space-y-4 px-5 py-4">
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label for="m-date" class="mb-1 block text-sm font-medium">Date</label>
+						<input id="m-date" type="date" bind:value={mileageForm.date} class="w-full" required />
+					</div>
+					<div>
+						<label for="m-miles" class="mb-1 block text-sm font-medium">Miles</label>
+						<input id="m-miles" type="number" step="0.1" min="0" bind:value={mileageForm.miles} class="w-full" required />
+					</div>
+				</div>
+				<div>
+					<div class="mb-1 block text-sm font-medium">Kind</div>
+					<div class="flex rounded-md border border-slate-300 dark:border-slate-700">
+						{#each ['business', 'medical', 'charity'] as const as k (k)}
+							<button
+								type="button"
+								class="flex-1 py-2 text-sm font-medium capitalize first:rounded-l-md last:rounded-r-md {mileageForm.kind === k
+									? 'bg-brand-500 text-white'
+									: 'bg-transparent text-slate-700 dark:text-slate-300'}"
+								onclick={() => (mileageForm.kind = k)}
+							>
+								{k}
+							</button>
+						{/each}
+					</div>
+					<p class="mt-1 text-xs text-slate-500">
+						Rate: {(mileageRate(year, mileageForm.kind) * 100).toFixed(0)}¢/mi · deduction:
+						<span class="font-medium tabular-nums">{money((Number(mileageForm.miles) || 0) * mileageRate(year, mileageForm.kind))}</span>
+					</p>
+				</div>
+				{#if mileageForm.kind === 'business' && businesses.value.length > 0}
+					<div>
+						<label for="m-biz" class="mb-1 block text-sm font-medium">Business (optional)</label>
+						<select id="m-biz" bind:value={mileageForm.businessId} class="w-full">
+							<option value={null}>— None —</option>
+							{#each businesses.value as b (b.id)}
+								<option value={b.id}>{b.name}</option>
+							{/each}
+						</select>
+					</div>
+				{/if}
+				<div>
+					<label for="m-purpose" class="mb-1 block text-sm font-medium">Purpose</label>
+					<input id="m-purpose" type="text" bind:value={mileageForm.purpose} placeholder="e.g. Client meeting in SF" class="w-full" />
+				</div>
+				<div>
+					<label for="m-notes" class="mb-1 block text-sm font-medium">Notes</label>
+					<textarea id="m-notes" bind:value={mileageForm.notes} rows="2" class="w-full"></textarea>
+				</div>
+			</form>
+			<div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3 dark:border-slate-800">
+				<Button variant="secondary" onclick={() => (showMileageForm = false)}>Cancel</Button>
+				<Button onclick={saveMileage}>Save</Button>
+			</div>
+		</div>
+	</div>
+{/if}
