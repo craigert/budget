@@ -213,18 +213,18 @@
 					</div>
 					<div class="flex shrink-0 gap-1">
 						<button
-							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
 							onclick={() => openEdit(t)}
 							aria-label="Edit"
 						>
-							✎
+							<Icon name="general/edit-01" size={16} />
 						</button>
 						<button
-							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 dark:hover:bg-slate-800"
 							onclick={() => remove(t)}
 							aria-label="Delete"
 						>
-							🗑
+							<Icon name="general/trash-01" size={16} />
 						</button>
 					</div>
 				</li>

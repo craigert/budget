@@ -126,8 +126,8 @@
 						<Icon name={c.icon} size={20} />
 					</div>
 					<span class="flex-1 truncate font-medium">{c.name}</span>
-					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onclick={() => openEdit(c)} aria-label="Edit">✎</button>
-					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onclick={() => archive(c)} aria-label="Archive">🗄</button>
+					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800" onclick={() => openEdit(c)} aria-label="Edit"><Icon name="general/edit-01" size={16} /></button>
+					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800" onclick={() => archive(c)} aria-label="Archive"><Icon name="general/archive" size={16} /></button>
 				</li>
 			{/each}
 		</ul>
@@ -145,8 +145,8 @@
 						<Icon name={c.icon} size={20} />
 					</div>
 					<span class="flex-1 truncate font-medium">{c.name}</span>
-					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onclick={() => openEdit(c)} aria-label="Edit">✎</button>
-					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onclick={() => archive(c)} aria-label="Archive">🗄</button>
+					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800" onclick={() => openEdit(c)} aria-label="Edit"><Icon name="general/edit-01" size={16} /></button>
+					<button class="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800" onclick={() => archive(c)} aria-label="Archive"><Icon name="general/archive" size={16} /></button>
 				</li>
 			{/each}
 		</ul>

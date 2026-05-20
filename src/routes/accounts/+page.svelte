@@ -7,6 +7,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	const accounts = live<Account[]>(
 		() => db.accounts.orderBy('createdAt').toArray(),
@@ -99,18 +100,18 @@
 						</div>
 						<div class="flex gap-1">
 							<button
-								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
 								onclick={() => openEdit(a)}
 								aria-label="Edit"
 							>
-								✎
+								<Icon name="general/edit-01" size={16} />
 							</button>
 							<button
-								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
 								onclick={() => archiveAccount(a)}
 								aria-label="Archive"
 							>
-								🗄
+								<Icon name="general/archive" size={16} />
 							</button>
 						</div>
 					</div>
