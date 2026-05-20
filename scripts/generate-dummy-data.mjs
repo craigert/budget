@@ -1,6 +1,7 @@
-// Generate a year of realistic dummy data.
-// Output: data/budget-2025-dummy.csv (Google-Sheets-friendly)
-//         data/budget-2025-dummy.json (BudgetSparrow Settings → Import format)
+// Generate a rolling 12 months of realistic dummy data.
+// Range: <today minus 12 months> through today (current month is partial).
+// Output: data/budget-demo.csv (Google-Sheets friendly)
+//         data/budget-demo.json (BudgetSparrow Settings → Import format)
 // Run: node scripts/generate-dummy-data.mjs
 
 import { writeFile, mkdir } from 'node:fs/promises';
@@ -10,7 +11,7 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outDir = join(__dirname, '..', 'data');
 
-// ---------- deterministic RNG so re-runs produce same output ----------
+// ---------- deterministic RNG ----------
 let _seed = 0x9e3779b9;
 const rand = () => {
 	_seed = (_seed * 1664525 + 1013904223) | 0;
@@ -22,15 +23,47 @@ const pick = (arr) => arr[Math.floor(rand() * arr.length)];
 const dollars = (n) => Math.round(n * 100) / 100;
 const chance = (p) => rand() < p;
 
+// ---------- date range: rolling 12 months ending today ----------
+const TODAY = new Date('2026-05-20T00:00:00Z');
+const TODAY_MONTH = TODAY.getUTCMonth() + 1; // 1-12
+const TODAY_DAY = TODAY.getUTCDate();
+const TODAY_YEAR = TODAY.getUTCFullYear();
+// Start exactly 12 months ago, first day of that month
+const startDate = new Date(Date.UTC(TODAY_YEAR, TODAY.getUTCMonth() - 12, 1));
+// We iterate by (year, month) tuples
+const MONTHS = []; // array of { y, m, lastDay }
+{
+	let cur = new Date(startDate);
+	while (
+		cur.getUTCFullYear() < TODAY_YEAR ||
+		(cur.getUTCFullYear() === TODAY_YEAR && cur.getUTCMonth() + 1 <= TODAY_MONTH)
+	) {
+		const y = cur.getUTCFullYear();
+		const m = cur.getUTCMonth() + 1;
+		// Final month is partial — only days up to TODAY_DAY
+		const lastDay =
+			y === TODAY_YEAR && m === TODAY_MONTH ? TODAY_DAY : new Date(Date.UTC(y, m, 0)).getUTCDate();
+		MONTHS.push({ y, m, lastDay });
+		cur = new Date(Date.UTC(y, cur.getUTCMonth() + 1, 1));
+	}
+}
+
+function iso(y, m, d) {
+	return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+function dayOfWeek(y, m, d) {
+	return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
 // ---------- accounts ----------
 const ACCOUNTS = [
-	{ id: 1, name: 'Checking', type: 'checking', openingBalance: 2500, currency: 'USD', archived: 0, createdAt: Date.parse('2025-01-01') },
-	{ id: 2, name: 'Savings', type: 'savings', openingBalance: 8000, currency: 'USD', archived: 0, createdAt: Date.parse('2025-01-01') },
-	{ id: 3, name: 'Credit Card', type: 'credit', openingBalance: 0, currency: 'USD', archived: 0, createdAt: Date.parse('2025-01-01') },
-	{ id: 4, name: 'Business Checking', type: 'checking', openingBalance: 4500, currency: 'USD', archived: 0, createdAt: Date.parse('2025-01-01') }
+	{ id: 1, name: 'Checking', type: 'checking', openingBalance: 2500, currency: 'USD', archived: 0, createdAt: Date.parse(iso(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 1)) },
+	{ id: 2, name: 'Savings', type: 'savings', openingBalance: 8000, currency: 'USD', archived: 0, createdAt: Date.parse(iso(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 1)) },
+	{ id: 3, name: 'Credit Card', type: 'credit', openingBalance: 0, currency: 'USD', archived: 0, createdAt: Date.parse(iso(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 1)) },
+	{ id: 4, name: 'Business Checking', type: 'checking', openingBalance: 4500, currency: 'USD', archived: 0, createdAt: Date.parse(iso(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 1)) }
 ];
 
-// ---------- categories (matches seed.ts + Business expenses) ----------
+// ---------- categories ----------
 const CATEGORIES = [
 	{ id: 1, name: 'Groceries', kind: 'expense', icon: 'finance-ecommerce/shopping-cart', color: '#16a34a', archived: 0, sortOrder: 10 },
 	{ id: 2, name: 'Dining', kind: 'expense', icon: 'finance-ecommerce/receipt', color: '#f97316', archived: 0, sortOrder: 20 },
@@ -53,25 +86,8 @@ const CATEGORIES = [
 	{ id: 19, name: 'Refunds', kind: 'income', icon: 'arrows/reverse-left', color: '#84cc16', archived: 0, sortOrder: 30 },
 	{ id: 20, name: 'Other income', kind: 'income', icon: 'finance-ecommerce/coins-stacked-01', color: '#a3e635', archived: 0, sortOrder: 999 }
 ];
-const catId = (name) => CATEGORIES.find((c) => c.name === name).id;
-const acctId = (name) => ACCOUNTS.find((a) => a.name === name).id;
-
-// ---------- helpers ----------
-function isoDate(year, month, day) {
-	return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-function lastDayOfMonth(year, month) {
-	return new Date(year, month, 0).getDate();
-}
-function dayOfWeek(year, month, day) {
-	return new Date(year, month - 1, day).getDay(); // 0=Sun, 5=Fri
-}
-function* eachDay(year) {
-	for (let m = 1; m <= 12; m++) {
-		const last = lastDayOfMonth(year, m);
-		for (let d = 1; d <= last; d++) yield { y: year, m, d };
-	}
-}
+const catId = (n) => CATEGORIES.find((c) => c.name === n).id;
+const acctId = (n) => ACCOUNTS.find((a) => a.name === n).id;
 
 // ---------- payee pools ----------
 const GROCERY_PAYEES = ["Trader Joe's", 'Safeway', 'Whole Foods', 'Costco', 'Aldi', 'Target Grocery'];
@@ -99,151 +115,139 @@ function add(date, accountId, categoryId, amount, payee, notes = '', cleared = 1
 	});
 }
 
-const YEAR = 2025;
-
-// ---------- monthly recurring (bills) ----------
-for (let m = 1; m <= 12; m++) {
-	// Rent — 1st of month, slight variance for late fees skipped
-	add(isoDate(YEAR, m, 1), acctId('Checking'), catId('Rent / Mortgage'), -1800, 'Greystar Properties', 'Monthly rent');
-
-	// Electricity — around the 5th
-	add(isoDate(YEAR, m, 5), acctId('Checking'), catId('Utilities'), -(80 + rand() * 60), 'PG&E', 'Electricity & gas');
-
-	// Internet — 3rd
-	add(isoDate(YEAR, m, 3), acctId('Checking'), catId('Internet / Phone'), -65, 'Comcast', 'Internet');
-
-	// Phone — 10th
-	add(isoDate(YEAR, m, 10), acctId('Checking'), catId('Internet / Phone'), -52, 'T-Mobile', 'Cell phone');
-
-	// Streaming subscriptions
-	add(isoDate(YEAR, m, 15), acctId('Credit Card'), catId('Subscriptions'), -15.99, 'Netflix');
-	add(isoDate(YEAR, m, 8), acctId('Credit Card'), catId('Subscriptions'), -10.99, 'Spotify');
-	if (m % 3 === 0) add(isoDate(YEAR, m, 20), acctId('Credit Card'), catId('Subscriptions'), -9.99, 'iCloud Storage');
-
-	// Gym
-	add(isoDate(YEAR, m, 1), acctId('Checking'), catId('Health'), -42, 'Fitness SF', 'Gym membership');
-
-	// Car insurance (monthly)
-	add(isoDate(YEAR, m, 20), acctId('Checking'), catId('Insurance'), -132, 'Geico', 'Auto insurance');
-
-	// Health insurance (out-of-pocket, monthly)
-	add(isoDate(YEAR, m, 1), acctId('Checking'), catId('Insurance'), -285, 'Blue Cross', 'Health insurance');
-
-	// Business: software subscriptions
-	add(isoDate(YEAR, m, 7), acctId('Business Checking'), catId('Business expenses'), -54.99, 'Adobe Creative Cloud');
-	add(isoDate(YEAR, m, 12), acctId('Business Checking'), catId('Business expenses'), -21, 'GitHub Pro');
-	add(isoDate(YEAR, m, 18), acctId('Business Checking'), catId('Business expenses'), -10, 'Notion');
-	add(isoDate(YEAR, m, 25), acctId('Business Checking'), catId('Business expenses'), -29, 'Figma');
-
-	// Credit card minimum / payoff (skip — treated as transfer not a real expense)
+// ---------- recurring bills (per month) ----------
+for (const { y, m, lastDay } of MONTHS) {
+	const safeDay = (d) => Math.min(d, lastDay);
+	add(iso(y, m, safeDay(1)), acctId('Checking'), catId('Rent / Mortgage'), -1800, 'Greystar Properties', 'Monthly rent');
+	if (5 <= lastDay) add(iso(y, m, 5), acctId('Checking'), catId('Utilities'), -(80 + rand() * 60), 'PG&E', 'Electricity & gas');
+	if (3 <= lastDay) add(iso(y, m, 3), acctId('Checking'), catId('Internet / Phone'), -65, 'Comcast', 'Internet');
+	if (10 <= lastDay) add(iso(y, m, 10), acctId('Checking'), catId('Internet / Phone'), -52, 'T-Mobile', 'Cell phone');
+	if (15 <= lastDay) add(iso(y, m, 15), acctId('Credit Card'), catId('Subscriptions'), -15.99, 'Netflix');
+	if (8 <= lastDay) add(iso(y, m, 8), acctId('Credit Card'), catId('Subscriptions'), -10.99, 'Spotify');
+	if (m % 3 === 0 && 20 <= lastDay) add(iso(y, m, 20), acctId('Credit Card'), catId('Subscriptions'), -9.99, 'iCloud Storage');
+	add(iso(y, m, safeDay(1)), acctId('Checking'), catId('Health'), -42, 'Fitness SF', 'Gym membership');
+	if (20 <= lastDay) add(iso(y, m, 20), acctId('Checking'), catId('Insurance'), -132, 'Geico', 'Auto insurance');
+	add(iso(y, m, safeDay(1)), acctId('Checking'), catId('Insurance'), -285, 'Blue Cross', 'Health insurance');
+	if (7 <= lastDay) add(iso(y, m, 7), acctId('Business Checking'), catId('Business expenses'), -54.99, 'Adobe Creative Cloud');
+	if (12 <= lastDay) add(iso(y, m, 12), acctId('Business Checking'), catId('Business expenses'), -21, 'GitHub Pro');
+	if (18 <= lastDay) add(iso(y, m, 18), acctId('Business Checking'), catId('Business expenses'), -10, 'Notion');
+	if (25 <= lastDay) add(iso(y, m, 25), acctId('Business Checking'), catId('Business expenses'), -29, 'Figma');
 }
 
-// ---------- bi-weekly paycheck (every other Friday) ----------
-// Find first Friday of the year then step by 14 days
+// ---------- bi-weekly paycheck ----------
 {
-	let cursor = new Date(YEAR, 0, 1);
-	while (cursor.getDay() !== 5) cursor.setDate(cursor.getDate() + 1);
-	while (cursor.getFullYear() === YEAR) {
-		const date = isoDate(cursor.getFullYear(), cursor.getMonth() + 1, cursor.getDate());
-		add(date, acctId('Checking'), catId('Salary'), 3250 + intBetween(-50, 80), 'Acme Corp', 'Bi-weekly paycheck');
-		cursor.setDate(cursor.getDate() + 14);
+	// First Friday on or after startDate
+	let cursor = new Date(startDate);
+	while (cursor.getUTCDay() !== 5) cursor.setUTCDate(cursor.getUTCDate() + 1);
+	while (cursor <= TODAY) {
+		const y = cursor.getUTCFullYear();
+		const m = cursor.getUTCMonth() + 1;
+		const d = cursor.getUTCDate();
+		add(iso(y, m, d), acctId('Checking'), catId('Salary'), 3250 + intBetween(-50, 80), 'Acme Corp', 'Bi-weekly paycheck');
+		cursor.setUTCDate(cursor.getUTCDate() + 14);
 	}
 }
 
-// Quarterly business income (consulting / freelance)
-for (const m of [2, 5, 8, 11]) {
-	add(isoDate(YEAR, m, 15), acctId('Business Checking'), catId('Other income'), intBetween(1500, 3500), 'Freelance Client', 'Project invoice');
-}
-
-// Annual interest payouts (Q1, Q2, Q3, Q4)
-for (const m of [3, 6, 9, 12]) {
-	add(isoDate(YEAR, m, 28), acctId('Savings'), catId('Interest'), dollars(12 + rand() * 18), 'High Yield Savings', 'Quarterly interest');
+// ---------- quarterly freelance income & interest ----------
+for (const { y, m, lastDay } of MONTHS) {
+	if ([2, 5, 8, 11].includes(m) && 15 <= lastDay) {
+		add(iso(y, m, 15), acctId('Business Checking'), catId('Other income'), intBetween(1500, 3500), 'Freelance Client', 'Project invoice');
+	}
+	if ([3, 6, 9, 12].includes(m) && 28 <= lastDay) {
+		add(iso(y, m, 28), acctId('Savings'), catId('Interest'), dollars(12 + rand() * 18), 'High Yield Savings', 'Quarterly interest');
+	}
 }
 
 // ---------- weekly: groceries & gas ----------
-for (const { y, m, d } of eachDay(YEAR)) {
-	const dow = dayOfWeek(y, m, d);
-	// Groceries — Sundays mostly, sometimes Wednesdays
-	if (dow === 0 || (dow === 3 && chance(0.35))) {
-		add(isoDate(y, m, d), acctId('Credit Card'), catId('Groceries'), -(45 + rand() * 95), pick(GROCERY_PAYEES));
-	}
-	// Gas — roughly weekly
-	if (dow === 5 && chance(0.7)) {
-		add(isoDate(y, m, d), acctId('Credit Card'), catId('Gas / Fuel'), -(38 + rand() * 22), pick(GAS_PAYEES));
-	}
-}
-
-// ---------- daily-ish: dining ----------
-for (const { y, m, d } of eachDay(YEAR)) {
-	const meals = intBetween(0, 1) + (chance(0.35) ? 1 : 0);
-	for (let i = 0; i < meals; i++) {
-		const amt = chance(0.6) ? between(8, 22) : between(22, 65);
-		add(isoDate(y, m, d), acctId('Credit Card'), catId('Dining'), -amt, pick(DINING_PAYEES));
+for (const { y, m, lastDay } of MONTHS) {
+	for (let d = 1; d <= lastDay; d++) {
+		const dow = dayOfWeek(y, m, d);
+		if (dow === 0 || (dow === 3 && chance(0.35))) {
+			add(iso(y, m, d), acctId('Credit Card'), catId('Groceries'), -(45 + rand() * 95), pick(GROCERY_PAYEES));
+		}
+		if (dow === 5 && chance(0.7)) {
+			add(iso(y, m, d), acctId('Credit Card'), catId('Gas / Fuel'), -(38 + rand() * 22), pick(GAS_PAYEES));
+		}
 	}
 }
 
-// ---------- monthly-ish: shopping, entertainment, health, transport ----------
-for (let m = 1; m <= 12; m++) {
-	// Shopping 1-4 times per month
+// ---------- dining (daily-ish) ----------
+for (const { y, m, lastDay } of MONTHS) {
+	for (let d = 1; d <= lastDay; d++) {
+		const meals = intBetween(0, 1) + (chance(0.35) ? 1 : 0);
+		for (let i = 0; i < meals; i++) {
+			const amt = chance(0.6) ? between(8, 22) : between(22, 65);
+			add(iso(y, m, d), acctId('Credit Card'), catId('Dining'), -amt, pick(DINING_PAYEES));
+		}
+	}
+}
+
+// ---------- monthly-ish ----------
+for (const { y, m, lastDay } of MONTHS) {
 	const shops = intBetween(1, 4);
 	for (let i = 0; i < shops; i++) {
-		const d = intBetween(2, lastDayOfMonth(YEAR, m) - 1);
-		add(isoDate(YEAR, m, d), acctId('Credit Card'), catId('Shopping'), -between(25, 180), pick(SHOPPING_PAYEES));
+		const d = intBetween(2, Math.max(2, lastDay - 1));
+		add(iso(y, m, d), acctId('Credit Card'), catId('Shopping'), -between(25, 180), pick(SHOPPING_PAYEES));
 	}
-	// Entertainment 0-3 per month
 	const ents = intBetween(0, 3);
 	for (let i = 0; i < ents; i++) {
-		const d = intBetween(2, lastDayOfMonth(YEAR, m) - 1);
-		add(isoDate(YEAR, m, d), acctId('Credit Card'), catId('Entertainment'), -between(12, 75), pick(ENTERTAINMENT_PAYEES));
+		const d = intBetween(2, Math.max(2, lastDay - 1));
+		add(iso(y, m, d), acctId('Credit Card'), catId('Entertainment'), -between(12, 75), pick(ENTERTAINMENT_PAYEES));
 	}
-	// Health — 1-2 per month (pharmacy, copay)
 	const hits = intBetween(0, 2);
 	for (let i = 0; i < hits; i++) {
-		const d = intBetween(2, lastDayOfMonth(YEAR, m) - 1);
+		const d = intBetween(2, Math.max(2, lastDay - 1));
 		const amt = chance(0.6) ? between(8, 35) : between(80, 220);
-		add(isoDate(YEAR, m, d), acctId('Credit Card'), catId('Health'), -amt, pick(HEALTH_PAYEES));
+		add(iso(y, m, d), acctId('Credit Card'), catId('Health'), -amt, pick(HEALTH_PAYEES));
 	}
-	// Transport (rideshare/transit) — 2-6/mo
 	const rides = intBetween(2, 6);
 	for (let i = 0; i < rides; i++) {
-		const d = intBetween(2, lastDayOfMonth(YEAR, m) - 1);
-		add(isoDate(YEAR, m, d), acctId('Credit Card'), catId('Transport'), -between(8, 40), chance(0.5) ? 'Uber' : 'Lyft');
+		const d = intBetween(2, Math.max(2, lastDay - 1));
+		add(iso(y, m, d), acctId('Credit Card'), catId('Transport'), -between(8, 40), chance(0.5) ? 'Uber' : 'Lyft');
 	}
-	// Business misc — 1-2/mo (office supplies, hardware)
 	if (chance(0.7)) {
-		const d = intBetween(2, lastDayOfMonth(YEAR, m) - 1);
-		add(isoDate(YEAR, m, d), acctId('Business Checking'), catId('Business expenses'), -between(45, 300), pick(BUSINESS_PAYEES));
+		const d = intBetween(2, Math.max(2, lastDay - 1));
+		add(iso(y, m, d), acctId('Business Checking'), catId('Business expenses'), -between(45, 300), pick(BUSINESS_PAYEES));
 	}
 }
 
-// ---------- occasional: travel, refunds ----------
-// 2-3 trips
-const tripMonths = [4, 7, 11];
-for (const tm of tripMonths) {
-	const start = intBetween(5, 20);
-	add(isoDate(YEAR, tm, start), acctId('Credit Card'), catId('Travel'), -between(280, 620), pick(TRAVEL_PAYEES), 'Flights');
-	add(isoDate(YEAR, tm, start + 1), acctId('Credit Card'), catId('Travel'), -between(180, 480), pick(TRAVEL_PAYEES), 'Hotel');
-	add(isoDate(YEAR, tm, start + 2), acctId('Credit Card'), catId('Dining'), -between(40, 110), 'Vacation Dining');
+// ---------- occasional: travel (3 trips spread across range) ----------
+const totalMonths = MONTHS.length;
+const tripIdxs = [Math.floor(totalMonths * 0.25), Math.floor(totalMonths * 0.55), Math.floor(totalMonths * 0.85)];
+for (const idx of tripIdxs) {
+	if (idx >= totalMonths) continue;
+	const { y, m, lastDay } = MONTHS[idx];
+	const start = intBetween(5, Math.max(5, lastDay - 5));
+	add(iso(y, m, start), acctId('Credit Card'), catId('Travel'), -between(280, 620), pick(TRAVEL_PAYEES), 'Flights');
+	if (start + 1 <= lastDay) add(iso(y, m, start + 1), acctId('Credit Card'), catId('Travel'), -between(180, 480), pick(TRAVEL_PAYEES), 'Hotel');
+	if (start + 2 <= lastDay) add(iso(y, m, start + 2), acctId('Credit Card'), catId('Dining'), -between(40, 110), 'Vacation Dining');
 }
 
-// A few refunds spread through the year
+// ---------- refunds, sprinkled ----------
 for (let i = 0; i < 4; i++) {
-	const m = intBetween(1, 12);
-	const d = intBetween(1, lastDayOfMonth(YEAR, m));
-	add(isoDate(YEAR, m, d), acctId('Credit Card'), catId('Refunds'), between(15, 95), pick(SHOPPING_PAYEES), 'Return');
+	const mo = MONTHS[Math.floor(rand() * MONTHS.length)];
+	const d = intBetween(1, mo.lastDay);
+	add(iso(mo.y, mo.m, d), acctId('Credit Card'), catId('Refunds'), between(15, 95), pick(SHOPPING_PAYEES), 'Return');
 }
 
-// Annual taxes (April)
-add(isoDate(YEAR, 4, 15), acctId('Checking'), catId('Fees'), -between(800, 2200), 'IRS', 'Federal income tax');
-add(isoDate(YEAR, 4, 15), acctId('Checking'), catId('Fees'), -between(150, 500), 'State Tax Board', 'State income tax');
-
-// Holiday spending bump in December
-for (let i = 0; i < 8; i++) {
-	const d = intBetween(1, 24);
-	add(isoDate(YEAR, 12, d), acctId('Credit Card'), catId('Shopping'), -between(30, 220), pick(SHOPPING_PAYEES), 'Holiday gifts');
+// ---------- annual taxes (April, if April is in range) ----------
+for (const { y, m, lastDay } of MONTHS) {
+	if (m === 4 && 15 <= lastDay) {
+		add(iso(y, m, 15), acctId('Checking'), catId('Fees'), -between(800, 2200), 'IRS', 'Federal income tax');
+		add(iso(y, m, 15), acctId('Checking'), catId('Fees'), -between(150, 500), 'State Tax Board', 'State income tax');
+	}
 }
 
-// ---------- budgets (typical monthly budget per category) ----------
+// ---------- December holiday spending ----------
+for (const { y, m, lastDay } of MONTHS) {
+	if (m !== 12) continue;
+	for (let i = 0; i < 8; i++) {
+		const d = intBetween(1, Math.min(24, lastDay));
+		add(iso(y, m, d), acctId('Credit Card'), catId('Shopping'), -between(30, 220), pick(SHOPPING_PAYEES), 'Holiday gifts');
+	}
+}
+
+// ---------- budgets for every month in range ----------
 const MONTHLY_BUDGET = {
 	'Groceries': 600,
 	'Dining': 400,
@@ -262,25 +266,20 @@ const MONTHLY_BUDGET = {
 	'Business expenses': 250,
 	'Other expense': 50
 };
-
 const budgets = [];
 let bId = 1;
-for (let m = 1; m <= 12; m++) {
-	const month = `${YEAR}-${String(m).padStart(2, '0')}`;
+for (const { y, m } of MONTHS) {
+	const monthKey = `${y}-${String(m).padStart(2, '0')}`;
 	for (const [name, amt] of Object.entries(MONTHLY_BUDGET)) {
-		budgets.push({ id: bId++, categoryId: catId(name), month, amount: amt });
+		budgets.push({ id: bId++, categoryId: catId(name), month: monthKey, amount: amt });
 	}
 }
 
 // ---------- write outputs ----------
 await mkdir(outDir, { recursive: true });
-
-// sort transactions by date for cleaner CSV
 transactions.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-// re-id after sort (Dexie ids are arbitrary anyway)
 transactions.forEach((t, i) => (t.id = i + 1));
 
-// CSV: Date, Account, Type, Category, Payee, Expense, Income, Notes
 const csvRows = ['Date,Account,Type,Category,Payee,Expense,Income,Notes'];
 for (const t of transactions) {
 	const acct = ACCOUNTS.find((a) => a.id === t.accountId).name;
@@ -289,21 +288,10 @@ for (const t of transactions) {
 	const expense = isExpense ? (-t.amount).toFixed(2) : '';
 	const income = !isExpense ? t.amount.toFixed(2) : '';
 	const escape = (s) => (String(s).includes(',') || String(s).includes('"') ? `"${String(s).replace(/"/g, '""')}"` : String(s));
-	csvRows.push([
-		t.date,
-		escape(acct),
-		isExpense ? 'Expense' : 'Income',
-		escape(cat.name),
-		escape(t.payee),
-		expense,
-		income,
-		escape(t.notes ?? '')
-	].join(','));
+	csvRows.push([t.date, escape(acct), isExpense ? 'Expense' : 'Income', escape(cat.name), escape(t.payee), expense, income, escape(t.notes ?? '')].join(','));
 }
-const csvPath = join(outDir, 'budget-2025-dummy.csv');
-await writeFile(csvPath, csvRows.join('\n'), 'utf8');
+await writeFile(join(outDir, 'budget-demo.csv'), csvRows.join('\n'), 'utf8');
 
-// JSON backup format (BudgetSparrow Settings → Import)
 const backup = {
 	app: 'budget',
 	version: 1,
@@ -318,16 +306,12 @@ const backup = {
 		{ key: 'theme', value: 'system' }
 	]
 };
-const jsonPath = join(outDir, 'budget-2025-dummy.json');
-await writeFile(jsonPath, JSON.stringify(backup, null, 2), 'utf8');
+await writeFile(join(outDir, 'budget-demo.json'), JSON.stringify(backup, null, 2), 'utf8');
 
-// ---------- summary ----------
 const totalExpense = transactions.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0);
 const totalIncome = transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-console.log(`Wrote ${transactions.length} transactions for ${YEAR}.`);
+console.log(`Wrote ${transactions.length} transactions across ${MONTHS.length} months.`);
+console.log(`  Range:   ${iso(MONTHS[0].y, MONTHS[0].m, 1)} to ${iso(MONTHS[MONTHS.length-1].y, MONTHS[MONTHS.length-1].m, MONTHS[MONTHS.length-1].lastDay)}`);
 console.log(`  Income:  $${totalIncome.toFixed(2)}`);
 console.log(`  Expense: $${totalExpense.toFixed(2)}`);
 console.log(`  Net:     $${(totalIncome + totalExpense).toFixed(2)}`);
-console.log('Files:');
-console.log(`  ${csvPath}`);
-console.log(`  ${jsonPath}`);

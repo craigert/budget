@@ -70,11 +70,11 @@
 	}
 
 	async function loadDemoData() {
-		if (!confirm('Load 2025 demo data? This REPLACES your current data.')) return;
+		if (!confirm('Load 12 months of demo data? This REPLACES your current data.')) return;
 		status = '';
 		busy = true;
 		try {
-			const res = await fetch(`${base}/budget-2025-dummy.json`);
+			const res = await fetch(`${base}/budget-demo.json`);
 			if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
 			const data = (await res.json()) as BackupFile;
 			await importJSON(data, 'replace');
@@ -139,7 +139,7 @@
 			<Button onclick={downloadBackup} disabled={busy}>Export JSON</Button>
 			<Button variant="secondary" onclick={() => fileInput.click()} disabled={busy}>Import JSON…</Button>
 			<Button variant="secondary" onclick={() => csvInput.click()} disabled={busy}>Import CSV…</Button>
-			<Button variant="secondary" onclick={loadDemoData} disabled={busy}>Load 2025 demo data</Button>
+			<Button variant="secondary" onclick={loadDemoData} disabled={busy}>Load demo data (12 months)</Button>
 			<Button variant="ghost" onclick={reseedDefaults} disabled={busy}>Restore default categories</Button>
 			<input bind:this={fileInput} type="file" accept="application/json,.json" class="hidden" onchange={handleFile} />
 			<input bind:this={csvInput} type="file" accept="text/csv,.csv" class="hidden" onchange={handleCSV} />
