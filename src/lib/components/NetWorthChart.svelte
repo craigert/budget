@@ -11,14 +11,13 @@
 	let { points, anchorAtZero = false }: Props = $props();
 
 	// Viewport (rendered via viewBox so it scales to the container).
-	// 16:5 aspect — wider than 16:9 to give horizontal room for daily detail
-	// without making the chart too tall on desktop.
+	// Half-height aspect (~6.4:1) — wide and shallow for a trend strip.
 	const W = 1600;
-	const H = 500;
+	const H = 250;
 	const padL = 110;
 	const padR = 40;
-	const padT = 32;
-	const padB = 56;
+	const padT = 18;
+	const padB = 40;
 	const innerW = W - padL - padR;
 	const innerH = H - padT - padB;
 

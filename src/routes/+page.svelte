@@ -38,7 +38,7 @@
 
 	const currentYear = Number(thisMonth().slice(0, 4));
 	const networthPoints = $derived(
-		netWorthSeries(currentYear, allAccounts.value, allTxs.value)
+		netWorthSeries(currentYear, allAccounts.value, allTxs.value, undefined, 'monthly')
 	);
 
 	const catMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
