@@ -394,12 +394,12 @@
 <PageHeader title="Transactions" subtitle={`${filtered.length} shown · net ${money(totalShown)}`}>
 	{#snippet actions()}
 		{#if businesses.value.length > 0 && businessFilter !== null && filtered.length > 0}
-			<Button variant="secondary" size="sm" onclick={exportCSV}>Export CSV</Button>
+			<Button variant="secondary" onclick={exportCSV}>Export CSV</Button>
 		{/if}
 		{#if businesses.value.length > 0}
-			<Button variant="secondary" size="sm" onclick={() => (showAddTxModal = true)}>+ Add to business</Button>
+			<Button variant="secondary" onclick={() => (showAddTxModal = true)}>+ Add to business</Button>
 		{/if}
-		<Button variant="secondary" size="sm" onclick={openAddBusiness}>+ New business</Button>
+		<Button variant="secondary" onclick={openAddBusiness}>+ New business</Button>
 		<Button variant="onbrand" onclick={openCreate} disabled={accounts.value.length === 0}>+ Transaction</Button>
 	{/snippet}
 </PageHeader>
