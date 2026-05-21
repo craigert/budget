@@ -99,6 +99,8 @@ export interface Budget {
 	categoryId: number;
 	month: string; // YYYY-MM
 	amount: number;
+	/** 1 = one-time override for this month only; won't be copied forward */
+	temporary?: number; // 0 | 1
 }
 
 export interface Setting {
