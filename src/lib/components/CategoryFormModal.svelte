@@ -2,6 +2,8 @@
 	import { db } from '$lib/db';
 	import type { Category, CategoryKind } from '$lib/db/types';
 	import { ICON_GROUPS } from '$lib/icons';
+	import { monthLabel } from '$lib/utils/format';
+	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 	import Modal from './Modal.svelte';
 	import Button from './Button.svelte';
 	import Icon from './Icon.svelte';
@@ -35,6 +37,7 @@
 	});
 	let iconQuery = $state('');
 	let isOneTime = $state(false);
+	let budgetAmount = $state(0);
 
 	// Reset form whenever the modal opens
 	$effect(() => {
@@ -55,6 +58,7 @@
 				};
 			}
 			isOneTime = false;
+			budgetAmount = 0;
 			iconQuery = '';
 		}
 	});
@@ -98,6 +102,11 @@
 				sortOrder: maxSort + 10,
 				tempMonth: isOneTime && forMonth ? forMonth : null
 			} as Category)) as number;
+
+			// Create the budget entry for this month if an amount was provided
+			if (forMonth && budgetAmount > 0) {
+				await db.budgets.add({ categoryId: id, month: forMonth, amount: budgetAmount });
+			}
 		}
 		onsaved?.(id);
 		onclose();
@@ -110,6 +119,27 @@
 			<label for="cat-name" class="mb-1 block text-sm font-medium">Name</label>
 			<input id="cat-name" type="text" bind:value={form.name} class="w-full" required autofocus />
 		</div>
+
+		{#if !editing && forMonth}
+			<div>
+				<label for="cat-budget" class="mb-1 block text-sm font-medium">
+					Budget for {monthLabel(forMonth)} <span class="font-normal text-slate-400">(optional)</span>
+				</label>
+				<div class="relative">
+					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+					<input
+						id="cat-budget"
+						type="number"
+						step="0.01"
+						min="0"
+						bind:value={budgetAmount}
+						use:clearOnFocus
+						class="w-full pl-6"
+						placeholder="0"
+					/>
+				</div>
+			</div>
+		{/if}
 
 		{#if !editing && forMonth}
 			<label class="flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors {isOneTime ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}">
