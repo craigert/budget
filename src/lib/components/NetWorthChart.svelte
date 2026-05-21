@@ -157,17 +157,20 @@
 		return out;
 	});
 
-	// X ticks: month starts, label every month (or every other for narrow screens)
+	// X ticks: month starts, label every month. Key is the unique YYYY-MM so
+	// a rolling 13-month window (May 2025 → May 2026) doesn't collide on the
+	// duplicate "May" label.
 	const monthTicks = $derived.by(() => {
 		if (points.length === 0) return [];
 		const seen = new Set<string>();
-		const ticks: { x: number; label: string }[] = [];
+		const ticks: { key: string; x: number; label: string }[] = [];
 		points.forEach((p, i) => {
 			const ym = p.date.slice(0, 7);
 			if (!seen.has(ym)) {
 				seen.add(ym);
 				const monthIdx = Number(ym.slice(5, 7));
 				ticks.push({
+					key: ym,
 					x: x(i),
 					label: new Date(Number(ym.slice(0, 4)), monthIdx - 1, 1)
 						.toLocaleDateString(undefined, { month: 'short' })
@@ -421,7 +424,7 @@
 					{compactMoney(t.value)}
 				</span>
 			{/each}
-			{#each monthTicks as tk (tk.label)}
+			{#each monthTicks as tk (tk.key)}
 				{@const pctX = (tk.x / W) * 100}
 				<span
 					class="pointer-events-none absolute -translate-x-1/2 text-[10px] font-medium text-slate-400 sm:text-xs dark:text-slate-500"
