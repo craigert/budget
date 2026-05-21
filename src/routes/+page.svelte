@@ -261,7 +261,7 @@
 		</div>
 		<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
 			<div class="mb-3.5 flex items-center justify-between">
-				<span class="section-label">Health score</span>
+				<span class="section-label">Financial health</span>
 				<span
 					class="bs-tag"
 					style="background: color-mix(in oklch, var(--bs-pos) 12%, transparent); color: var(--bs-pos);"
