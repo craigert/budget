@@ -62,6 +62,22 @@
 					.map((s) => ({ label: 'Uncategorized', value: s.total, color: '#94a3b8', icon: '•' }))
 			)
 	);
+
+	// Financial-health metric: savings rate = (income - expense) / income.
+	// Color-coded against the 50/30/20 rule's 20% baseline.
+	const savedThisMonth = $derived(inc.value - exp.value);
+	const savingsRate = $derived(inc.value > 0 ? (savedThisMonth / inc.value) * 100 : 0);
+	const healthStatus = $derived.by(() => {
+		if (inc.value <= 0)
+			return { label: 'No income yet', color: 'text-slate-500', accent: 'bg-slate-200' };
+		if (savedThisMonth < 0)
+			return { label: 'Overspending', color: 'text-red-600', accent: 'bg-red-500' };
+		if (savingsRate >= 20)
+			return { label: 'Excellent', color: 'text-brand-500', accent: 'bg-brand-500' };
+		if (savingsRate >= 10)
+			return { label: 'Good', color: 'text-emerald-500', accent: 'bg-emerald-500' };
+		return { label: 'Tight', color: 'text-amber-500', accent: 'bg-amber-500' };
+	});
 </script>
 
 <PageHeader title="Home" subtitle={monthLabel(month)} />
@@ -70,16 +86,30 @@
 	<!-- KPI tiles -->
 	<div class="grid gap-3 sm:grid-cols-3">
 		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="section-label">Net worth</div>
-			<div class="mt-1.5 text-3xl font-bold tabular-nums {nw.value < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'}">{money(nw.value)}</div>
-		</div>
-		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
 			<div class="section-label">Income this month</div>
 			<div class="mt-1.5 text-3xl font-bold tabular-nums text-brand-500">{money(inc.value)}</div>
 		</div>
 		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
 			<div class="section-label">Spending this month</div>
 			<div class="mt-1.5 text-3xl font-bold tabular-nums">{money(exp.value)}</div>
+		</div>
+		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+			<div class="flex items-baseline justify-between gap-2">
+				<div class="section-label">Financial health</div>
+				<span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white {healthStatus.accent}">
+					{healthStatus.label}
+				</span>
+			</div>
+			<div class="mt-1.5 text-3xl font-bold tabular-nums {healthStatus.color}">
+				{inc.value > 0 ? `${savingsRate.toFixed(0)}%` : '—'}
+			</div>
+			<div class="mt-0.5 text-xs text-slate-500">
+				{#if inc.value > 0}
+					{savedThisMonth >= 0 ? 'Saved' : 'Overspent'} <span class="font-medium tabular-nums {savedThisMonth < 0 ? 'text-red-600' : ''}">{money(Math.abs(savedThisMonth))}</span> this month
+				{:else}
+					Log some income to see your savings rate
+				{/if}
+			</div>
 		</div>
 	</div>
 
