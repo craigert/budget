@@ -10,6 +10,14 @@
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 		<meta name="apple-mobile-web-app-title" content="Budget" />
+		<!--
+			Web app manifest. Path is fixed by vite-plugin-pwa
+			(filename: 'manifest.webmanifest', emitted at the site root).
+			Without this link, iOS Safari and Chrome's PWA criteria can't
+			discover the manifest, so Add-to-Home-Screen creates a plain
+			bookmark instead of a standalone-mode app icon.
+		-->
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
 		<link rel="icon" type="image/png" sizes="64x64" href="%sveltekit.assets%/icons/icon-64.png" />
 		<link rel="icon" type="image/png" sizes="192x192" href="%sveltekit.assets%/icons/icon-192.png" />
 		<link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/icons/apple-touch-icon.png" />

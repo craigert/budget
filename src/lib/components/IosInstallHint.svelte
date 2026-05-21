@@ -1,11 +1,13 @@
 <script lang="ts">
 	/**
-	 * iOS install hint.
+	 * iOS install hint — instructional, not actionable.
 	 *
-	 * Mobile Safari ignores beforeinstallprompt and only installs via the
-	 * Share sheet → "Add to Home Screen" path. Chrome on Android handles this
-	 * itself with its built-in install banner, but iOS users get nothing,
-	 * so they need a one-time nudge.
+	 * Mobile Safari ignores `beforeinstallprompt` and gives no JS API to
+	 * trigger Add-to-Home-Screen. The ONLY install path is the user tapping
+	 * Share → Add to Home Screen themselves. So this component is a tutorial
+	 * card, not a button. We deliberately make it look like instructions
+	 * (numbered steps, share-icon glyph, no big tappable area) so users don't
+	 * mistake it for an install button and tap the card expecting magic.
 	 *
 	 * Shows only when:
 	 *   - we're on iOS Safari (not Chrome/Firefox/Edge for iOS, which can't install)
@@ -22,13 +24,12 @@
 	function isIosSafari(): boolean {
 		if (typeof navigator === 'undefined') return false;
 		const ua = navigator.userAgent;
-		// iPad now reports as Macintosh; check for touch as well.
+		// iPad now reports as Macintosh; check for touch too.
 		const isIos = /iPad|iPhone|iPod/.test(ua) ||
 			(ua.includes('Macintosh') && 'ontouchend' in document);
 		if (!isIos) return false;
-		// Exclude in-app browsers (CriOS = Chrome on iOS, FxiOS = Firefox on iOS,
-		// EdgiOS = Edge on iOS, OPiOS = Opera on iOS). None can install a PWA.
-		if (/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)) return false;
+		// Exclude in-app browsers and non-Safari iOS browsers — none can install.
+		if (/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//.test(ua)) return false;
 		return /Safari/.test(ua);
 	}
 
@@ -36,7 +37,6 @@
 		if (typeof window === 'undefined') return false;
 		return (
 			window.matchMedia?.('(display-mode: standalone)').matches ||
-			// Legacy iOS API.
 			(window.navigator as Navigator & { standalone?: boolean }).standalone === true
 		);
 	}
@@ -58,30 +58,60 @@
 </script>
 
 {#if visible}
+	<!--
+		Pinned to the bottom of the screen, just above Safari's own toolbar
+		so the arrow can visually point toward Safari's Share button.
+	-->
 	<div
 		role="dialog"
-		aria-label="Install BudgetSparrow"
-		class="fixed bottom-20 left-1/2 z-50 w-[min(22rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-xl border border-brand-200 bg-white p-4 shadow-xl dark:border-brand-900 dark:bg-slate-800"
+		aria-label="Install BudgetSparrow on your home screen"
+		class="fixed bottom-2 left-1/2 z-50 w-[min(22rem,calc(100%-1rem))] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-700 dark:bg-slate-800"
 	>
-		<div class="flex items-start gap-3">
-			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-900/40 dark:text-brand-300">
-				<Icon name="general/download-cloud" size={18} />
-			</div>
-			<div class="flex-1 text-sm">
-				<p class="font-medium text-slate-900 dark:text-slate-100">Install BudgetSparrow</p>
-				<p class="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-					Tap <Icon name="general/share-04" size={12} /> Share, then
-					<span class="font-medium">Add to Home Screen</span> for the best experience.
-				</p>
+		<div class="mb-3 flex items-center justify-between gap-3">
+			<div class="flex items-center gap-2">
+				<Icon name="general/download-cloud" size={18} class="text-brand-600 dark:text-brand-400" />
+				<p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Install BudgetSparrow</p>
 			</div>
 			<button
 				type="button"
 				onclick={dismiss}
 				aria-label="Dismiss"
-				class="-mr-1 -mt-1 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+				class="-mr-1 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
 			>
 				<Icon name="general/x-close" size={16} />
 			</button>
 		</div>
+
+		<ol class="space-y-2 text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+			<li class="flex items-start gap-2">
+				<span class="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-700 dark:bg-brand-900/50 dark:text-brand-200">1</span>
+				<span class="flex flex-wrap items-center gap-1">
+					Tap the
+					<span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium dark:bg-slate-700">
+						<Icon name="general/share-04" size={12} /> Share
+					</span>
+					button in Safari's toolbar.
+				</span>
+			</li>
+			<li class="flex items-start gap-2">
+				<span class="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-700 dark:bg-brand-900/50 dark:text-brand-200">2</span>
+				<span>
+					Scroll down and choose
+					<span class="font-medium text-slate-900 dark:text-white">Add to Home Screen</span>.
+				</span>
+			</li>
+			<li class="flex items-start gap-2">
+				<span class="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-700 dark:bg-brand-900/50 dark:text-brand-200">3</span>
+				<span>Tap <span class="font-medium text-slate-900 dark:text-white">Add</span> to confirm.</span>
+			</li>
+		</ol>
+
+		<button
+			type="button"
+			onclick={dismiss}
+			class="mt-3 w-full rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+		>
+			Got it
+		</button>
 	</div>
 {/if}
