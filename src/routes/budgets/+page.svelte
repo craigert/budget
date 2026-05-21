@@ -21,7 +21,7 @@
 
 	const expense = $derived(
 		categories.value
-			.filter((c) => c.archived === 0 && c.kind === 'expense')
+			.filter((c) => c.archived === 0 && c.kind === 'expense' && (c.tempMonth == null || c.tempMonth === month))
 			.sort((a, b) => a.sortOrder - b.sortOrder)
 	);
 	const income = $derived(
@@ -55,28 +55,16 @@
 		pendingChange = { categoryId, categoryName, amount: Math.max(0, Number(rawValue) || 0) };
 	}
 
-	type BudgetScope = 'month' | 'month-temp' | 'forward' | 'all';
+	type BudgetScope = 'month' | 'forward' | 'all';
 
 	async function applyBudgetChange(scope: BudgetScope) {
 		if (!pendingChange) return;
 		const { categoryId, amount } = pendingChange;
 		const cleaned = amount; // already clamped in stageBudgetChange
-		const isTemp = scope === 'month-temp';
 
-		if (scope === 'month' || scope === 'month-temp') {
-			// Single-month update — preserve or set the temporary flag
-			const existing = budgetMap.get(categoryId);
-			if (existing?.id) {
-				if (cleaned === 0) {
-					await db.budgets.delete(existing.id);
-				} else {
-					await db.budgets.update(existing.id, { amount: cleaned, temporary: isTemp ? 1 : 0 });
-				}
-			} else if (cleaned > 0) {
-				await db.budgets.add({ categoryId, month, amount: cleaned, temporary: isTemp ? 1 : 0 });
-			}
+		if (scope === 'month') {
+			await setAmount(categoryId, cleaned);
 		} else {
-			// forward or all — always clears temporary flag on every touched entry
 			let entries = await db.budgets.where('categoryId').equals(categoryId).toArray();
 			if (scope === 'forward') {
 				entries = entries.filter((b) => b.month >= month);
@@ -88,12 +76,12 @@
 					}
 				} else {
 					for (const b of entries) {
-						if (b.id) await db.budgets.update(b.id, { amount: cleaned, temporary: 0 });
+						if (b.id) await db.budgets.update(b.id, { amount: cleaned });
 					}
 					// Ensure current month exists if it wasn't already in the set
 					const hasCurrentMonth = entries.some((b) => b.month === month);
 					if (!hasCurrentMonth) {
-						await db.budgets.add({ categoryId, month, amount: cleaned, temporary: 0 });
+						await db.budgets.add({ categoryId, month, amount: cleaned });
 					}
 				}
 			});
@@ -113,18 +101,22 @@
 			alert('No budgets in the previous month to copy.');
 			return;
 		}
+		// Build a set of one-time category IDs so we can skip them
+		const allCats = await db.categories.toArray();
+		const oneTimeCatIds = new Set(allCats.filter((c) => c.tempMonth != null).map((c) => c.id!));
+
 		await db.transaction('rw', db.budgets, async () => {
 			for (const b of prevBudgets) {
-				// Never carry temporary one-month budgets forward
-				if (b.temporary === 1) continue;
+				// Never carry one-time categories into another month
+				if (oneTimeCatIds.has(b.categoryId)) continue;
 				const existing = await db.budgets
 					.where(['categoryId', 'month'])
 					.equals([b.categoryId, month])
 					.first();
 				if (existing?.id) {
-					await db.budgets.update(existing.id, { amount: b.amount, temporary: 0 });
+					await db.budgets.update(existing.id, { amount: b.amount });
 				} else {
-					await db.budgets.add({ categoryId: b.categoryId, month, amount: b.amount, temporary: 0 });
+					await db.budgets.add({ categoryId: b.categoryId, month, amount: b.amount });
 				}
 			}
 		});
@@ -214,7 +206,7 @@
 				{#each expense as c (c.id)}
 					{@const budgetEntry = budgetMap.get(c.id!)}
 					{@const budgeted = budgetEntry?.amount ?? 0}
-					{@const isTemp = budgetEntry?.temporary === 1}
+					{@const isTemp = c.tempMonth != null}
 					{@const spent = spendMap.get(c.id!) ?? 0}
 					{@const remaining = budgeted - spent}
 					{@const pct = budgeted > 0 ? Math.min(100, (spent / budgeted) * 100) : 0}
@@ -345,6 +337,7 @@
 	open={showModal}
 	editing={editing}
 	defaultKind={defaultKind}
+	forMonth={month}
 	onclose={() => (showModal = false)}
 />
 
@@ -377,16 +370,6 @@
 				>
 					<span class="font-medium">Just {monthLabel(month)}</span>
 					<span class="text-xs text-slate-400">This month only</span>
-				</button>
-				<button
-					class="flex w-full items-center justify-between px-5 py-3.5 text-left text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20"
-					onclick={() => applyBudgetChange('month-temp')}
-				>
-					<span class="flex items-center gap-2 font-medium">
-						Just {monthLabel(month)}
-						<span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">1× Temporary</span>
-					</span>
-					<span class="text-xs text-slate-400">Won't copy to other months</span>
 				</button>
 				<button
 					class="flex w-full items-center justify-between px-5 py-3.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"

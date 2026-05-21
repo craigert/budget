@@ -10,11 +10,13 @@
 		open: boolean;
 		editing: Category | null;
 		defaultKind?: CategoryKind;
+		/** Pass the currently viewed month (YYYY-MM) to enable the one-time toggle */
+		forMonth?: string;
 		onclose: () => void;
 		onsaved?: (id: number) => void;
 	}
 
-	let { open, editing, defaultKind = 'expense', onclose, onsaved }: Props = $props();
+	let { open, editing, defaultKind = 'expense', forMonth, onclose, onsaved }: Props = $props();
 
 	const COLORS = [
 		'#16a34a', '#f97316', '#0ea5e9', '#eab308', '#06b6d4', '#a855f7',
@@ -32,6 +34,7 @@
 		color: '#64748b'
 	});
 	let iconQuery = $state('');
+	let isOneTime = $state(false);
 
 	// Reset form whenever the modal opens
 	$effect(() => {
@@ -51,6 +54,7 @@
 					color: '#64748b'
 				};
 			}
+			isOneTime = false;
 			iconQuery = '';
 		}
 	});
@@ -91,7 +95,8 @@
 			id = (await db.categories.add({
 				...payload,
 				archived: 0,
-				sortOrder: maxSort + 10
+				sortOrder: maxSort + 10,
+				tempMonth: isOneTime && forMonth ? forMonth : null
 			} as Category)) as number;
 		}
 		onsaved?.(id);
@@ -105,6 +110,19 @@
 			<label for="cat-name" class="mb-1 block text-sm font-medium">Name</label>
 			<input id="cat-name" type="text" bind:value={form.name} class="w-full" required autofocus />
 		</div>
+
+		{#if !editing && forMonth}
+			<label class="flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors {isOneTime ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}">
+				<input type="checkbox" bind:checked={isOneTime} class="shrink-0 rounded" />
+				<div>
+					<div class="text-sm font-medium">One-time category</div>
+					<div class="text-xs text-slate-500">Only appears in the budget view for this month — won't show in future months</div>
+				</div>
+				{#if isOneTime}
+					<span class="ml-auto shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">1×</span>
+				{/if}
+			</label>
+		{/if}
 
 		<div>
 			<div class="mb-1 block text-sm font-medium">Type</div>
