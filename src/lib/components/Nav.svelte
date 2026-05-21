@@ -109,29 +109,35 @@
 </nav>
 
 <style>
-	/* Nav row pulled into a single style so light/dark/active states all
-	   resolve from --bs-* tokens. Active state matches the design's filled
-	   green pill with brand-tinted text. */
+	/*
+	 * Nav row styling lifted from the design's mockup:
+	 * - Inactive text reads --bs-text (dark navy) — not a muted gray. Items
+	 *   sit confident against the cream sidebar.
+	 * - Active state is just a pale --bs-brand-soft background pill. Text
+	 *   stays --bs-text; we do NOT tint it brand. The contrast is in the
+	 *   bg, not the text. Matches the mockup's "Home" pill look exactly.
+	 * - Hover on inactive is a subtle text-3 wash so the affordance is
+	 *   readable without competing with the active pill.
+	 */
 	:global(.bs-nav-item) {
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		padding: 9px 12px;
+		padding: 10px 14px;
 		font-size: 14px;
 		font-weight: 500;
-		color: var(--bs-text-2);
+		color: var(--bs-text);
 		border-radius: var(--bs-radius-sm);
-		transition: background-color 0.12s ease, color 0.12s ease;
+		transition: background-color 0.12s ease;
 	}
 	:global(.bs-nav-item:hover) {
-		background: color-mix(in oklch, var(--bs-text-3) 10%, transparent);
-		color: var(--bs-text);
+		background: color-mix(in oklch, var(--bs-text-3) 12%, transparent);
 	}
 	:global(.bs-nav-item.bs-nav-active) {
-		background: color-mix(in oklch, var(--bs-brand) 14%, transparent);
-		color: var(--bs-brand);
+		background: var(--bs-brand-soft);
+		color: var(--bs-text);
 	}
 	:global(.bs-nav-item.bs-nav-active:hover) {
-		background: color-mix(in oklch, var(--bs-brand) 20%, transparent);
+		background: color-mix(in oklch, var(--bs-brand-soft) 80%, var(--bs-text-3));
 	}
 </style>
