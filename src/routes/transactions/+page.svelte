@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
 	import type { Account, Business, Category, Transaction } from '$lib/db/types';
@@ -22,8 +24,12 @@
 	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
 	const categoryMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
 
-	// filters
-	let q = $state('');
+	// filters — `q` can be pre-seeded via ?q=… (e.g., from the global search overlay)
+	let q = $state(page.url.searchParams.get('q') ?? '');
+	$effect(() => {
+		const initial = page.url.searchParams.get('q');
+		if (initial && initial !== q) q = initial;
+	});
 	let accountFilter = $state<number | ''>('');
 	let categoryFilter = $state<number | ''>('');
 	let fromDate = $state('');

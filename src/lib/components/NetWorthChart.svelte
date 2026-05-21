@@ -3,6 +3,20 @@
 	import { money } from '$lib/utils/format';
 	import type { NetWorthPoint } from '$lib/utils/netWorthSeries';
 
+	function compactMoney(v: number): string {
+		const abs = Math.abs(v);
+		const sign = v < 0 ? '-' : '';
+		if (abs >= 1_000_000) {
+			const m = v / 1_000_000;
+			return `${sign.replace('-', '-')}$${Math.abs(m).toFixed(abs >= 10_000_000 ? 0 : 1)}M`;
+		}
+		if (abs >= 1_000) {
+			const k = v / 1_000;
+			return `${sign.replace('-', '-')}$${Math.abs(k).toFixed(abs >= 10_000 ? 0 : 1)}K`;
+		}
+		return `${sign}$${Math.round(abs)}`;
+	}
+
 	interface Props {
 		points: NetWorthPoint[];
 		anchorAtZero?: boolean;
@@ -209,7 +223,7 @@
 				</linearGradient>
 			</defs>
 
-			<!-- Y grid + labels -->
+			<!-- Y grid lines (labels are rendered as HTML below so they scale crisply on mobile) -->
 			{#each yTicks as t (t.value)}
 				<line
 					x1={padL}
@@ -220,31 +234,6 @@
 					class="text-slate-100 dark:text-slate-800/60"
 					stroke-width="1.5"
 				/>
-				<text
-					x={padL - 8}
-					y={t.y}
-					text-anchor="end"
-					dominant-baseline="middle"
-					class="fill-slate-400 dark:fill-slate-500"
-					font-size="13"
-					font-weight="500"
-				>
-					{money(t.value)}
-				</text>
-			{/each}
-
-			<!-- X-axis month labels -->
-			{#each monthTicks as tk (tk.label)}
-				<text
-					x={tk.x}
-					y={H - 16}
-					text-anchor="middle"
-					class="fill-slate-400 dark:fill-slate-500"
-					font-size="13"
-					font-weight="500"
-				>
-					{tk.label}
-				</text>
 			{/each}
 
 			<!-- Area fill -->
@@ -306,6 +295,27 @@
 				/>
 			{/if}
 		</svg>
+
+			<!-- HTML axis labels — kept in CSS pixels so they stay readable on mobile.
+			     Y values are abbreviated ($26K) so they fit any screen. -->
+			{#each yTicks as t (t.value)}
+				{@const pctY = (t.y / H) * 100}
+				<span
+					class="pointer-events-none absolute -translate-y-1/2 whitespace-nowrap pr-1 text-right text-[10px] font-medium text-slate-400 sm:text-xs dark:text-slate-500"
+					style="left:0; top:{pctY}%; width:{(padL / W) * 100}%;"
+				>
+					{compactMoney(t.value)}
+				</span>
+			{/each}
+			{#each monthTicks as tk (tk.label)}
+				{@const pctX = (tk.x / W) * 100}
+				<span
+					class="pointer-events-none absolute -translate-x-1/2 text-[10px] font-medium text-slate-400 sm:text-xs dark:text-slate-500"
+					style="left:{pctX}%; bottom:0;"
+				>
+					{tk.label}
+				</span>
+			{/each}
 
 			<!-- Floating tooltip anchored to the hovered data point -->
 			{#if hoverPoint && hoverIdx !== null}
