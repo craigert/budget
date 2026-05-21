@@ -22,28 +22,42 @@
 		if (href === '/') return path === base || path === `${base}/` || path === '/';
 		return path.startsWith(full);
 	}
+
+	const settingsActive = $derived(isActive(settingsItem.href));
 </script>
 
-<!-- Desktop sidebar (sticky so Settings stays in view) -->
-<aside class="hidden md:sticky md:top-0 md:flex md:h-screen md:w-56 md:flex-col md:self-start md:border-r md:border-slate-200 md:bg-white md:dark:border-slate-800 md:dark:bg-slate-900">
-	<a href={`${base}/`} class="flex flex-col items-center justify-center px-4 pt-6 pb-5 transition-opacity hover:opacity-80" aria-label="Home">
-		<!-- Wordmark per the Claude Design hand-off: "Budget" neutral,
-		     "Sparrow" in the warm mahogany accent to tie text to the bird. -->
+<!--
+	Desktop sidebar — Claude Design hand-off layout.
+	Compact inline wordmark at top (small logo + "Budget Sparrow" text where
+	"Sparrow" picks up the warm mahogany accent), nav items below, Settings
+	pinned at the bottom. Background uses --bs-bg so the sidebar visually
+	merges with the page body rather than reading as a distinct white panel.
+-->
+<aside
+	class="hidden md:sticky md:top-0 md:flex md:h-screen md:w-56 md:flex-col md:self-start"
+	style="background: var(--bs-bg); border-right: 0.5px solid var(--bs-border);"
+>
+	<a
+		href={`${base}/`}
+		class="flex items-center gap-2.5 px-5 pt-6 pb-6 transition-opacity hover:opacity-80"
+		aria-label="Home"
+	>
+		<img src={`${base}/logo.png`} alt="" class="h-9 w-9 object-contain shrink-0" />
 		<span
-			class="mb-2 text-lg font-semibold tracking-tight"
-			style="font-family: var(--bs-font-display); color: var(--bs-text);"
+			class="text-base font-semibold tracking-tight"
+			style="font-family: var(--bs-font-display); color: var(--bs-text); letter-spacing: -0.015em;"
 		>
 			Budget<span style="font-weight: 500; color: var(--bs-accent);">&nbsp;Sparrow</span>
 		</span>
-		<img src={`${base}/logo.png`} alt="BudgetSparrow" class="h-20 w-20 object-contain" />
 	</a>
 	<nav class="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
 		{#each items as item (item.href)}
+			{@const active = isActive(item.href)}
 			<a
 				href={`${base}${item.href === '/' ? '/' : item.href}`}
-				class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(item.href)
-					? 'bg-brand-500/10 text-brand-700 dark:bg-brand-500/20 dark:text-brand-100'
-					: 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}"
+				class="bs-nav-item"
+				class:bs-nav-active={active}
+				aria-current={active ? 'page' : undefined}
 			>
 				<Icon name={item.icon} size={18} />
 				{item.label}
@@ -51,12 +65,12 @@
 		{/each}
 	</nav>
 	<!-- Settings pinned to the bottom -->
-	<div class="border-t border-slate-200 px-3 py-3 dark:border-slate-800">
+	<div class="px-3 py-3" style="border-top: 0.5px solid var(--bs-border);">
 		<a
 			href={`${base}${settingsItem.href}`}
-			class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(settingsItem.href)
-				? 'bg-brand-500/10 text-brand-700 dark:bg-brand-500/20 dark:text-brand-100'
-				: 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}"
+			class="bs-nav-item"
+			class:bs-nav-active={settingsActive}
+			aria-current={settingsActive ? 'page' : undefined}
 		>
 			<Icon name={settingsItem.icon} size={18} />
 			{settingsItem.label}
@@ -66,14 +80,15 @@
 
 <!-- Mobile bottom nav: every item, with Settings pinned at the end -->
 <nav
-	class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden dark:border-slate-800 dark:bg-slate-900"
+	class="fixed inset-x-0 bottom-0 z-30 flex pb-[env(safe-area-inset-bottom)] md:hidden"
+	style="background: var(--bs-surface); border-top: 0.5px solid var(--bs-border);"
 >
 	{#each items as item (item.href)}
+		{@const active = isActive(item.href)}
 		<a
 			href={`${base}${item.href === '/' ? '/' : item.href}`}
-			class="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px] {isActive(item.href)
-				? 'text-brand-600 dark:text-brand-300'
-				: 'text-slate-500 dark:text-slate-400'}"
+			class="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px]"
+			style="color: {active ? 'var(--bs-brand)' : 'var(--bs-text-3)'};"
 		>
 			<Icon name={item.icon} size={20} />
 			<span class="w-full truncate text-center leading-none">{item.label}</span>
@@ -81,11 +96,38 @@
 	{/each}
 	<a
 		href={`${base}${settingsItem.href}`}
-		class="flex min-w-0 flex-1 flex-col items-center gap-0.5 border-l border-slate-200 px-1 py-2 text-[10px] dark:border-slate-800 {isActive(settingsItem.href)
-			? 'text-brand-600 dark:text-brand-300'
-			: 'text-slate-500 dark:text-slate-400'}"
+		class="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px]"
+		style="border-left: 0.5px solid var(--bs-border); color: {settingsActive ? 'var(--bs-brand)' : 'var(--bs-text-3)'};"
 	>
 		<Icon name={settingsItem.icon} size={20} />
 		<span class="w-full truncate text-center leading-none">{settingsItem.label}</span>
 	</a>
 </nav>
+
+<style>
+	/* Nav row pulled into a single style so light/dark/active states all
+	   resolve from --bs-* tokens. Active state matches the design's filled
+	   green pill with brand-tinted text. */
+	:global(.bs-nav-item) {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 9px 12px;
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--bs-text-2);
+		border-radius: var(--bs-radius-sm);
+		transition: background-color 0.12s ease, color 0.12s ease;
+	}
+	:global(.bs-nav-item:hover) {
+		background: color-mix(in oklch, var(--bs-text-3) 10%, transparent);
+		color: var(--bs-text);
+	}
+	:global(.bs-nav-item.bs-nav-active) {
+		background: color-mix(in oklch, var(--bs-brand) 14%, transparent);
+		color: var(--bs-brand);
+	}
+	:global(.bs-nav-item.bs-nav-active:hover) {
+		background: color-mix(in oklch, var(--bs-brand) 20%, transparent);
+	}
+</style>

@@ -116,13 +116,41 @@ body {
 }
 
 /* Reusable surface utility for cards that want the design's cream-on-cream
-   feel (lighter than bg, with a hairline border). Existing cards still using
-   bg-white dark:bg-slate-900 will continue to render white — opt them into
-   .bs-surface as they get touched. */
+   feel (lighter than bg, with a hairline border). */
 .bs-surface {
 	background: var(--bs-surface);
 	border: 0.5px solid var(--bs-border);
 	border-radius: var(--bs-radius);
+	box-shadow: var(--bs-shadow);
+}
+
+/*
+ * Card pattern migration without touching every page.
+ *
+ * The app uses ~38 cards of the form
+ *   <... class="rounded-{xl,lg} border border-slate-200 bg-white p-X dark:border-slate-800 dark:bg-slate-900">
+ * The compound class selectors below re-skin every one of those to the
+ * design's cream surface + hairline border + 14px radius, in both light
+ * and dark modes. Order of classes in the markup doesn't matter — CSS
+ * compound selectors match the set, not the sequence.
+ *
+ * Limited to the exact "card" pattern so isolated bg-white usages (icon
+ * tiles, modal headers, etc.) are unaffected.
+ */
+.rounded-xl.border.border-slate-200.bg-white,
+.rounded-lg.border.border-slate-200.bg-white,
+.rounded-2xl.border.border-slate-200.bg-white {
+	background: var(--bs-surface);
+	border-color: var(--bs-border);
+	border-width: 0.5px;
+	box-shadow: var(--bs-shadow);
+}
+.dark .rounded-xl.dark\:border-slate-800.dark\:bg-slate-900,
+.dark .rounded-lg.dark\:border-slate-800.dark\:bg-slate-900,
+.dark .rounded-2xl.dark\:border-slate-800.dark\:bg-slate-900 {
+	background: var(--bs-surface);
+	border-color: var(--bs-border);
+	border-width: 0.5px;
 	box-shadow: var(--bs-shadow);
 }
 
