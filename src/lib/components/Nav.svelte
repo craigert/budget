@@ -44,10 +44,10 @@
 	>
 		<img src={`${base}/logo.png`} alt="" class="h-9 w-9 object-contain shrink-0" />
 		<span
-			class="text-base font-semibold tracking-tight"
-			style="font-family: var(--bs-font-display); color: var(--bs-text); letter-spacing: -0.015em;"
+			class="text-lg font-semibold tracking-tight"
+			style="font-family: var(--bs-font-display); color: var(--bs-text); letter-spacing: -0.02em;"
 		>
-			Budget<span style="font-weight: 500; color: var(--bs-accent);">&nbsp;Sparrow</span>
+			Budget<span style="font-weight: 500; color: var(--bs-accent-2);">&nbsp;Sparrow</span>
 		</span>
 	</a>
 	<nav class="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
