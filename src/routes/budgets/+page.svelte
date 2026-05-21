@@ -48,6 +48,52 @@
 		}
 	}
 
+	// Pending budget change — holds a proposed edit while the scope dialog is open.
+	let pendingChange = $state<{ categoryId: number; categoryName: string; amount: number } | null>(null);
+
+	function stageBudgetChange(categoryId: number, categoryName: string, rawValue: number) {
+		pendingChange = { categoryId, categoryName, amount: Math.max(0, Number(rawValue) || 0) };
+	}
+
+	type BudgetScope = 'month' | 'forward' | 'all';
+
+	async function applyBudgetChange(scope: BudgetScope) {
+		if (!pendingChange) return;
+		const { categoryId, amount } = pendingChange;
+		const cleaned = amount; // already clamped in stageBudgetChange
+
+		if (scope === 'month') {
+			await setAmount(categoryId, cleaned);
+		} else {
+			let entries = await db.budgets.where('categoryId').equals(categoryId).toArray();
+			if (scope === 'forward') {
+				entries = entries.filter((b) => b.month >= month);
+			}
+			await db.transaction('rw', db.budgets, async () => {
+				if (cleaned === 0) {
+					for (const b of entries) {
+						if (b.id) await db.budgets.delete(b.id);
+					}
+				} else {
+					for (const b of entries) {
+						if (b.id) await db.budgets.update(b.id, { amount: cleaned });
+					}
+					// Ensure current month exists if it wasn't already in the set
+					const hasCurrentMonth = entries.some((b) => b.month === month);
+					if (!hasCurrentMonth) {
+						await db.budgets.add({ categoryId, month, amount: cleaned });
+					}
+				}
+			});
+		}
+
+		pendingChange = null;
+	}
+
+	function cancelBudgetChange() {
+		pendingChange = null;
+	}
+
 	async function copyPrevious() {
 		const prev = addMonths(month, -1);
 		const prevBudgets = await db.budgets.where('month').equals(prev).toArray();
@@ -170,9 +216,9 @@
 									step="0.01"
 									min="0"
 									class="w-full pl-6 text-right tabular-nums"
-									value={budgeted}
+									value={pendingChange?.categoryId === c.id! ? pendingChange.amount : budgeted}
 									use:clearOnFocus
-									onchange={(e) => setAmount(c.id!, Number((e.currentTarget as HTMLInputElement).value))}
+									onchange={(e) => stageBudgetChange(c.id!, c.name, Number((e.currentTarget as HTMLInputElement).value))}
 									aria-label="Monthly budget for {c.name}"
 								/>
 							</div>
@@ -282,3 +328,55 @@
 	defaultKind={defaultKind}
 	onclose={() => (showModal = false)}
 />
+
+<!-- Budget scope picker -->
+{#if pendingChange}
+	<div
+		class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm md:items-center md:p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={cancelBudgetChange}
+		onkeydown={(e) => e.key === 'Escape' && cancelBudgetChange()}
+		tabindex="-1"
+	>
+		<div
+			class="w-full max-w-sm overflow-hidden rounded-t-2xl bg-white shadow-xl md:rounded-2xl dark:bg-slate-900"
+			onclick={(e) => e.stopPropagation()}
+			role="document"
+			onkeydown={(e) => e.stopPropagation()}
+		>
+			<div class="px-5 pt-5 pb-4">
+				<h3 class="font-semibold">Update "{pendingChange.categoryName}" budget</h3>
+				<p class="mt-1 text-sm text-slate-500">
+					{pendingChange.amount > 0 ? `Set to ${money(pendingChange.amount)}.` : 'Remove budget.'} Which months should this apply to?
+				</p>
+			</div>
+			<div class="divide-y divide-slate-100 dark:divide-slate-800">
+				<button
+					class="flex w-full items-center justify-between px-5 py-3.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+					onclick={() => applyBudgetChange('month')}
+				>
+					<span class="font-medium">Just {monthLabel(month)}</span>
+					<span class="text-xs text-slate-400">This month only</span>
+				</button>
+				<button
+					class="flex w-full items-center justify-between px-5 py-3.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+					onclick={() => applyBudgetChange('forward')}
+				>
+					<span class="font-medium">{monthLabel(month)} and following</span>
+					<span class="text-xs text-slate-400">Updates all future months too</span>
+				</button>
+				<button
+					class="flex w-full items-center justify-between px-5 py-3.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+					onclick={() => applyBudgetChange('all')}
+				>
+					<span class="font-medium">All months</span>
+					<span class="text-xs text-slate-400">Entire history &amp; future</span>
+				</button>
+			</div>
+			<div class="border-t border-slate-200 px-5 py-3 dark:border-slate-800">
+				<Button variant="secondary" onclick={cancelBudgetChange} class="w-full">Cancel</Button>
+			</div>
+		</div>
+	</div>
+{/if}
