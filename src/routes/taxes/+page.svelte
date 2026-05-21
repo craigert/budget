@@ -64,18 +64,29 @@
 	const sumIncome = (arr: Transaction[]) => arr.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
 
 	// === Schedule C expense subsection definitions ===
+	// Display order (shown to user)
 	const EXPENSE_SECTIONS = [
-		{ key: 'labor',      label: 'Labor',            pattern: /\b(labor|payroll|contractor|contractors|wage|wages|salary|salaries|subcontract|employee)\b/i },
-		{ key: 'admin',      label: 'Administrative',   pattern: /\b(admin|software|subscription|legal|accounting|advertis|marketing|professional|bank.?fee|dues|license|permit|office supply|postage|print)\b/i },
-		{ key: 'operations', label: 'Operations',       pattern: /\b(operat|material|supply|supplies|equipment|repair|mainten|utilit|rent|shipping|inventory|telephone|phone|internet|hosting)\b/i },
-		{ key: 'vehicle',    label: 'Vehicle',          pattern: /\b(vehicle|auto|car|gas|fuel|mileage|transport|parking|toll)\b/i },
-		{ key: 'health',     label: 'Health Insurance', pattern: /\b(health insurance|health|medical insurance)\b/i },
-		{ key: 'homeoffice', label: 'Home Office',      pattern: /home.?office/i },
+		{ key: 'labor',      label: 'Labor' },
+		{ key: 'admin',      label: 'Administrative' },
+		{ key: 'operations', label: 'Operations' },
+		{ key: 'vehicle',    label: 'Vehicle' },
+		{ key: 'health',     label: 'Health Insurance' },
+		{ key: 'homeoffice', label: 'Home Office' },
 	] as const;
 
+	// Classification order — more specific patterns first to prevent false matches
+	const EXPENSE_CLASSIFIERS: { key: string; pattern: RegExp }[] = [
+		{ key: 'homeoffice', pattern: /home.?office/i },
+		{ key: 'vehicle',    pattern: /vehicle|automobile|car.and.truck|\btruck\b|\bcar\b|\bgas\b|fuel|mileage|parking|toll|\bauto\b/i },
+		{ key: 'health',     pattern: /health|medical|dental|vision|insur/i },
+		{ key: 'labor',      pattern: /labor|payroll|contract.?labor|wage|salary|salari|subcontract|employee|freelance|staff/i },
+		{ key: 'admin',      pattern: /admin|advertis|commission|legal|professional|software|subscript|office|postage|dues|license|permit|printing|bank.?fee/i },
+		{ key: 'operations', pattern: /operat|material|suppli|equipment|repair|mainten|utilit|\brent\b|shipping|inventor|telephone|internet|hosting|phone|depreci|travel/i },
+	];
+
 	function classifyExpenseCat(categoryName: string): string {
-		for (const s of EXPENSE_SECTIONS) {
-			if (s.pattern.test(categoryName)) return s.key;
+		for (const c of EXPENSE_CLASSIFIERS) {
+			if (c.pattern.test(categoryName)) return c.key;
 		}
 		return 'other';
 	}
