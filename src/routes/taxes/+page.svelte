@@ -14,6 +14,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	const today = new Date('2026-05-20T00:00:00Z');
 	let year = $state(today.getUTCFullYear());
@@ -128,16 +129,24 @@
 	});
 	const mortgageTotal = $derived(sumAbs(mortgageTxs));
 
-	// === Estimated tax payments (Q1-Q4) ===
-	const estimatedTaxTxs = $derived.by(() => {
-		// Payee looks federal IRS-y OR state-tax-y, in Fees or Taxes Paid category
+	// === Estimated tax payments — federal vs state (Q1-Q4) ===
+	const estimatedCandidates = $derived.by(() => {
 		const tp = categoryByName('Taxes Paid');
 		const fees = categoryByName('Fees');
-		const candidates = txs.value.filter((t) => t.amount < 0 && (
+		return txs.value.filter((t) => t.amount < 0 && (
 			(tp && t.categoryId === tp.id) || (fees && t.categoryId === fees.id)
 		));
-		return candidates.filter((t) => /\b(irs|estimated|treasury|state tax|department of revenue)\b/i.test(`${t.payee} ${t.notes}`));
 	});
+	const federalEstimatedTaxTxs = $derived.by(() =>
+		estimatedCandidates.filter((t) =>
+			/\b(irs|internal revenue|treasury|1040|federal)\b/i.test(`${t.payee} ${t.notes}`)
+		)
+	);
+	const stateEstimatedTaxTxs = $derived.by(() =>
+		estimatedCandidates.filter((t) =>
+			/\b(state tax|department of revenue|dept\.? of revenue|state treasurer|state income)\b/i.test(`${t.payee} ${t.notes}`)
+		)
+	);
 	function quarterOf(date: string): 1 | 2 | 3 | 4 {
 		const m = Number(date.slice(5, 7));
 		if (m <= 3) return 1;
@@ -145,12 +154,18 @@
 		if (m <= 9) return 3;
 		return 4;
 	}
-	const quarterlyTotals = $derived.by(() => {
+	const federalQuarterlyTotals = $derived.by(() => {
 		const buckets: Record<1 | 2 | 3 | 4, Transaction[]> = { 1: [], 2: [], 3: [], 4: [] };
-		for (const t of estimatedTaxTxs) buckets[quarterOf(t.date)].push(t);
+		for (const t of federalEstimatedTaxTxs) buckets[quarterOf(t.date)].push(t);
 		return buckets;
 	});
-	const estimatedTaxTotal = $derived(sumAbs(estimatedTaxTxs));
+	const stateQuarterlyTotals = $derived.by(() => {
+		const buckets: Record<1 | 2 | 3 | 4, Transaction[]> = { 1: [], 2: [], 3: [], 4: [] };
+		for (const t of stateEstimatedTaxTxs) buckets[quarterOf(t.date)].push(t);
+		return buckets;
+	});
+	const federalEstimatedTotal = $derived(sumAbs(federalEstimatedTaxTxs));
+	const stateEstimatedTotal = $derived(sumAbs(stateEstimatedTaxTxs));
 
 	// === Mileage ===
 	const mileageBuckets = $derived.by(() => {
@@ -517,6 +532,7 @@
 					step="100"
 					min="0"
 					bind:value={agiInput}
+					use:clearOnFocus
 					onblur={saveAGI}
 					placeholder="Enter AGI to compute the deductible portion"
 					class="w-full"
@@ -644,43 +660,93 @@
 
 	<!-- Estimated tax payments -->
 	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-		<div class="mb-3 flex items-start justify-between gap-2">
+		<div class="mb-4 flex items-start justify-between gap-2">
 			<div>
 				<h2 class="text-lg font-semibold">Estimated tax payments</h2>
-				<p class="mt-1 text-xs text-slate-500">Quarterly federal and state estimated taxes paid. Plug each Q's total into Form 1040 line 26 (federal) and the state equivalent.</p>
+				<p class="mt-1 text-xs text-slate-500">Federal and state quarterly payments tracked separately. Tag payees with "IRS" or "Treasury" for federal, "Department of Revenue" or "State Tax" for state.</p>
 			</div>
-			<div class="text-right">
-				<div class="text-2xl font-semibold tabular-nums">{money(estimatedTaxTotal)}</div>
-				<div class="text-xs text-slate-500">{estimatedTaxTxs.length} payment(s)</div>
+			<div class="flex gap-5 text-right">
+				<div>
+					<div class="text-xs text-slate-500">Federal</div>
+					<div class="text-xl font-semibold tabular-nums">{money(federalEstimatedTotal)}</div>
+				</div>
+				<div>
+					<div class="text-xs text-slate-500">State</div>
+					<div class="text-xl font-semibold tabular-nums">{money(stateEstimatedTotal)}</div>
+				</div>
 			</div>
 		</div>
-		<div class="grid gap-3 sm:grid-cols-4">
-			{#each [1, 2, 3, 4] as const as q (q)}
-				{@const key = `eq-${q}`}
-				{@const rows = quarterlyTotals[q]}
-				{@const total = sumAbs(rows)}
-				<div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-					<div class="section-label">Q{q}</div>
-					<div class="mt-1 text-xl font-semibold tabular-nums">{money(total)}</div>
-					<div class="mt-0.5 text-xs text-slate-500">{rows.length} payment(s)</div>
-					{#if rows.length > 0}
-						<button class="mt-1 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand(key)}>
-							{isOpen(key) ? 'Hide' : 'Show'}
-						</button>
-						{#if isOpen(key)}
-							<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-								{#each rows as t (t.id)}
-									<li class="flex items-center gap-2 px-2 py-1 text-xs">
-										<span class="w-16 shrink-0 text-slate-500">{t.date}</span>
-										<span class="flex-1 truncate">{t.payee}</span>
-										<span class="shrink-0 tabular-nums">{money(t.amount)}</span>
-									</li>
-								{/each}
-							</ul>
+
+		<!-- Federal Q1–Q4 -->
+		<div class="mb-5">
+			<div class="mb-2 flex items-baseline gap-2">
+				<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Federal</span>
+				<span class="text-xs text-slate-500">IRS · Form 1040, line 26</span>
+			</div>
+			<div class="grid gap-3 sm:grid-cols-4">
+				{#each [1, 2, 3, 4] as const as q (q)}
+					{@const key = `feq-${q}`}
+					{@const rows = federalQuarterlyTotals[q]}
+					{@const total = sumAbs(rows)}
+					<div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+						<div class="section-label">Q{q}</div>
+						<div class="mt-1 text-xl font-semibold tabular-nums">{money(total)}</div>
+						<div class="mt-0.5 text-xs text-slate-500">{rows.length} payment(s)</div>
+						{#if rows.length > 0}
+							<button class="mt-1 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand(key)}>
+								{isOpen(key) ? 'Hide' : 'Show'}
+							</button>
+							{#if isOpen(key)}
+								<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+									{#each rows as t (t.id)}
+										<li class="flex items-center gap-2 px-2 py-1 text-xs">
+											<span class="w-16 shrink-0 text-slate-500">{t.date}</span>
+											<span class="flex-1 truncate">{t.payee}</span>
+											<span class="shrink-0 tabular-nums">{money(t.amount)}</span>
+										</li>
+									{/each}
+								</ul>
+							{/if}
 						{/if}
-					{/if}
-				</div>
-			{/each}
+					</div>
+				{/each}
+			</div>
+		</div>
+
+		<!-- State Q1–Q4 -->
+		<div>
+			<div class="mb-2 flex items-baseline gap-2">
+				<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">State</span>
+				<span class="text-xs text-slate-500">Dept. of Revenue · state return equivalent</span>
+			</div>
+			<div class="grid gap-3 sm:grid-cols-4">
+				{#each [1, 2, 3, 4] as const as q (q)}
+					{@const key = `seq-${q}`}
+					{@const rows = stateQuarterlyTotals[q]}
+					{@const total = sumAbs(rows)}
+					<div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+						<div class="section-label">Q{q}</div>
+						<div class="mt-1 text-xl font-semibold tabular-nums">{money(total)}</div>
+						<div class="mt-0.5 text-xs text-slate-500">{rows.length} payment(s)</div>
+						{#if rows.length > 0}
+							<button class="mt-1 text-xs text-brand-600 hover:underline" onclick={() => toggleExpand(key)}>
+								{isOpen(key) ? 'Hide' : 'Show'}
+							</button>
+							{#if isOpen(key)}
+								<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+									{#each rows as t (t.id)}
+										<li class="flex items-center gap-2 px-2 py-1 text-xs">
+											<span class="w-16 shrink-0 text-slate-500">{t.date}</span>
+											<span class="flex-1 truncate">{t.payee}</span>
+											<span class="shrink-0 tabular-nums">{money(t.amount)}</span>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						{/if}
+					</div>
+				{/each}
+			</div>
 		</div>
 	</section>
 
@@ -781,7 +847,7 @@
 					</div>
 					<div>
 						<label for="m-miles" class="mb-1 block text-sm font-medium">Miles</label>
-						<input id="m-miles" type="number" step="0.1" min="0" bind:value={mileageForm.miles} class="w-full" required />
+						<input id="m-miles" type="number" step="0.1" min="0" bind:value={mileageForm.miles} use:clearOnFocus class="w-full" required />
 					</div>
 				</div>
 				<div>

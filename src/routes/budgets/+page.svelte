@@ -8,6 +8,7 @@
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import CategoryFormModal from '$lib/components/CategoryFormModal.svelte';
+	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	let month = $state(thisMonth());
 
@@ -167,8 +168,8 @@
 								step="0.01"
 								min="0"
 								class="w-28 text-right tabular-nums"
-								value={budgeted || ''}
-								placeholder="0"
+								value={budgeted}
+								use:clearOnFocus
 								onchange={(e) => setAmount(c.id!, Number((e.currentTarget as HTMLInputElement).value))}
 								aria-label="Monthly budget for {c.name}"
 							/>

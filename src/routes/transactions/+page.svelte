@@ -9,6 +9,7 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
@@ -293,6 +294,7 @@
 					step="0.01"
 					min="0"
 					bind:value={form.amount}
+					use:clearOnFocus
 					class="w-full"
 					required
 				/>

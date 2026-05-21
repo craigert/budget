@@ -8,6 +8,7 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	const accounts = live<Account[]>(
 		() => db.accounts.orderBy('createdAt').toArray(),
@@ -201,7 +202,7 @@
 			</div>
 			<div>
 				<label for="opening" class="mb-1 block text-sm font-medium">Opening balance</label>
-				<input id="opening" type="number" step="0.01" bind:value={form.openingBalance} class="w-full" />
+				<input id="opening" type="number" step="0.01" bind:value={form.openingBalance} use:clearOnFocus class="w-full" />
 			</div>
 		</div>
 	</form>
