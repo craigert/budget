@@ -13,28 +13,58 @@ export default defineConfig({
 			scope: '/',
 			base: '/',
 			manifest: {
-				name: 'Budget',
+				name: 'BudgetSparrow',
 				short_name: 'Budget',
-				description: 'Personal budgeting PWA',
+				description:
+					'Local-first personal budgeting PWA — accounts, transactions, budgets, goals, taxes, and receipt OCR.',
+				lang: 'en',
+				categories: ['finance', 'productivity'],
 				theme_color: '#0f172a',
 				background_color: '#0f172a',
 				display: 'standalone',
+				orientation: 'any',
 				start_url: '/',
 				scope: '/',
 				icons: [
-					{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-					{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+					{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+					{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
 					{
 						src: '/icons/icon-512-maskable.png',
 						sizes: '512x512',
 						type: 'image/png',
 						purpose: 'maskable'
 					}
+				],
+				// Long-press the app icon on Android / right-click on desktop Chrome
+				// to jump straight into these actions.
+				shortcuts: [
+					{
+						name: 'Add transaction',
+						short_name: 'Add',
+						url: '/transactions',
+						icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }]
+					},
+					{
+						name: 'Dashboard',
+						short_name: 'Home',
+						url: '/',
+						icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }]
+					},
+					{
+						name: 'Settings',
+						short_name: 'Settings',
+						url: '/settings',
+						icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }]
+					}
 				]
+				// TODO: add screenshots[] for richer Android install dialog once we
+				// have real captures to drop into static/screenshots/.
 			},
 			workbox: {
 				globPatterns: ['**/*.{js,css,html,svg,png,ico,webp,webmanifest}'],
-				navigateFallback: '/',
+				// Serve the offline shell when the network is unreachable for a
+				// navigation request. /offline is precached so it's always available.
+				navigateFallback: '/offline',
 				navigateFallbackDenylist: [/^\/api/]
 			},
 			devOptions: {

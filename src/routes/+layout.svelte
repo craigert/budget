@@ -19,7 +19,7 @@
 
 <svelte:head>
 	<title>Budget</title>
-	<meta name="theme-color" content="#0f172a" />
+	<!-- theme-color is set per-color-scheme in app.html. -->
 </svelte:head>
 
 <div class="flex min-h-screen flex-col md:flex-row">

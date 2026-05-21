@@ -9,6 +9,16 @@
 	import type { Account, Category, Transaction, Budget } from '$lib/db/types';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import { installPrompt } from '$lib/installPrompt.svelte';
+
+	let installStatus = $state<string | null>(null);
+
+	async function handleInstall() {
+		const result = await installPrompt.show();
+		if (result === 'accepted') installStatus = 'Installing…';
+		else if (result === 'dismissed') installStatus = 'Maybe next time.';
+		else installStatus = null;
+	}
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
@@ -119,6 +129,23 @@
 <PageHeader title="Settings" />
 
 <div class="space-y-8 p-4 md:p-8">
+	{#if installPrompt.canInstall}
+		<section class="rounded-xl border border-brand-200 bg-brand-50/60 p-5 dark:border-brand-800 dark:bg-brand-900/20">
+			<div class="flex flex-wrap items-center gap-3">
+				<div class="flex-1 min-w-0">
+					<h2 class="text-lg font-semibold text-brand-800 dark:text-brand-200">Install BudgetSparrow</h2>
+					<p class="mt-1 text-sm text-brand-700/80 dark:text-brand-200/80">
+						Add it to your home screen for a faster, full-screen experience.
+					</p>
+					{#if installStatus}
+						<p class="mt-2 text-xs text-brand-700 dark:text-brand-300">{installStatus}</p>
+					{/if}
+				</div>
+				<Button onclick={handleInstall}>Install</Button>
+			</div>
+		</section>
+	{/if}
+
 	<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
 		<h2 class="mb-4 text-lg font-semibold">Appearance</h2>
 		<div class="flex flex-wrap items-center gap-2">
