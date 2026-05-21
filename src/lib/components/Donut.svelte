@@ -61,11 +61,10 @@
 	}
 </script>
 
-<div class="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-8">
+<div class="@container flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-6">
 	<svg
 		viewBox="0 0 {size} {size}"
-		class="block aspect-square shrink-0 -rotate-90"
-		style="width: clamp(14rem, 28vw, 22rem);"
+		class="block aspect-square w-full max-w-[16rem] shrink-0 -rotate-90 sm:w-[45%] sm:max-w-[18rem]"
 		role="img"
 		aria-label="Donut chart"
 	>
@@ -172,7 +171,7 @@
 		</g>
 	</svg>
 
-	<ul class="flex-1 space-y-1.5 self-stretch text-sm sm:py-2">
+	<ul class="w-full min-w-0 flex-1 space-y-1.5 self-stretch text-sm sm:py-2">
 		{#if segments.length === 0}
 			<li class="text-slate-500">No data yet.</li>
 		{/if}

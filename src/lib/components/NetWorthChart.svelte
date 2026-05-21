@@ -43,11 +43,13 @@
 		mq.addEventListener('change', listener);
 		return () => mq.removeEventListener('change', listener);
 	});
-	const H = $derived(isMobile ? 500 : 250);
+	// Mobile: ~16:9 ratio (~190px tall at 343px viewport) — enough room
+	// to actually read the line. Desktop stays a shallow trend strip.
+	const H = $derived(isMobile ? 900 : 250);
 	const innerH = $derived(H - padT - padB);
-	const dotRadius = $derived(isMobile ? 14 : 7);
-	const dotRadiusLatest = $derived(isMobile ? 18 : 10);
-	const dotStrokeWidth = $derived(isMobile ? 6 : 4);
+	const dotRadius = $derived(isMobile ? 24 : 7);
+	const dotRadiusLatest = $derived(isMobile ? 30 : 10);
+	const dotStrokeWidth = $derived(isMobile ? 10 : 4);
 
 	const yDomain = $derived.by(() => {
 		if (points.length === 0) return { min: 0, max: 1 };
