@@ -517,7 +517,55 @@
 				{@const cat = t.categoryId != null ? categoryMap.get(t.categoryId) : null}
 				{@const acct = accountMap.get(t.accountId)}
 				{@const biz = t.businessId != null ? businessMap.get(t.businessId) : null}
-				<li data-tx-id={t.id} class="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
+				<li data-tx-id={t.id} class="group relative border-b border-slate-100 last:border-b-0 dark:border-slate-800">
+					<!-- Mobile: whole row is tap-to-edit so the row doesn't need
+					     dedicated inline icons (the right column was eating most
+					     of the width and truncating the payee to "T..."). On
+					     desktop the inline icons reveal on hover as the quick
+					     affordance. -->
+					<button
+						type="button"
+						onclick={() => openEdit(t)}
+						class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--bs-surface-2)] md:hidden"
+						aria-label="Edit transaction"
+					>
+						<div
+							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
+							style="background:{cat?.color ?? '#94a3b8'}22;color:{cat?.color ?? '#475569'}"
+						>
+							{#if cat?.icon}<Icon name={cat.icon} size={20} />{:else}<span>·</span>{/if}
+						</div>
+						<div class="min-w-0 flex-1">
+							<div class="flex items-baseline justify-between gap-2">
+								<div class="truncate font-medium">{t.payee || '(no payee)'}</div>
+								<div class="shrink-0 font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
+									{money(t.amount)}
+								</div>
+							</div>
+							<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+								<span>{formatDate(t.date)}</span>
+								<span aria-hidden>·</span>
+								<span class="truncate">{cat?.name ?? 'Uncategorized'}</span>
+								<span aria-hidden>·</span>
+								<span class="truncate">{acct?.name ?? '?'}</span>
+								{#if t.cleared === 0}
+									<span class="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">pending</span>
+								{/if}
+								{#if biz}
+									<span class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style="background:{biz.color}22;color:{biz.color}">
+										<Icon name={biz.icon} size={10} />
+										{biz.name}
+									</span>
+								{/if}
+							</div>
+							{#if t.notes}
+								<div class="mt-0.5 truncate text-xs text-slate-500">{t.notes}</div>
+							{/if}
+						</div>
+					</button>
+
+					<!-- Desktop: original layout with inline edit/delete icons -->
+					<div class="hidden items-center gap-3 px-4 py-3 md:flex">
 					<div
 						class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
 						style="background:{cat?.color ?? '#94a3b8'}22;color:{cat?.color ?? '#475569'}"
@@ -596,6 +644,7 @@
 						>
 							<Icon name="general/trash-01" size={16} />
 						</button>
+					</div>
 					</div>
 				</li>
 			{/each}
