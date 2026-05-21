@@ -226,7 +226,7 @@
 					text-anchor="end"
 					dominant-baseline="middle"
 					class="fill-slate-400 dark:fill-slate-500"
-					font-size="20"
+					font-size="13"
 					font-weight="500"
 				>
 					{money(t.value)}
@@ -240,7 +240,7 @@
 					y={H - 16}
 					text-anchor="middle"
 					class="fill-slate-400 dark:fill-slate-500"
-					font-size="20"
+					font-size="13"
 					font-weight="500"
 				>
 					{tk.label}
