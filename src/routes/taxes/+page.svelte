@@ -323,6 +323,86 @@
 
 	const educationTotal = $derived(sumAbs(educationTxs));
 
+	// === Ready-to-file document checklist ===
+	interface TaxDocItem {
+		id: string;
+		doc: string;
+		description: string;
+		where: string;
+		alwaysShow: boolean;
+	}
+	const TAX_DOCS: TaxDocItem[] = [
+		{ id: 'w2',         doc: 'W-2',                    description: 'Wage & tax statement from each employer',                                        where: 'Income → Wages & Salaries',                    alwaysShow: true  },
+		{ id: '1099nec',    doc: '1099-NEC',               description: 'Non-employee compensation from clients or freelance work',                        where: 'Income → Self-Employment (Schedule C)',         alwaysShow: false },
+		{ id: '1099k',      doc: '1099-K',                 description: 'Payment processor income (PayPal, Stripe, Square, Venmo, etc.)',                  where: 'Income → Self-Employment or Other Income',     alwaysShow: false },
+		{ id: '1099int',    doc: '1099-INT',               description: 'Bank interest income from savings or checking accounts',                          where: 'Income → Interest Income',                     alwaysShow: false },
+		{ id: '1099div',    doc: '1099-DIV',               description: 'Dividend distributions from investments or brokerage accounts',                   where: 'Income → Dividends',                           alwaysShow: false },
+		{ id: '1099b',      doc: '1099-B',                 description: 'Proceeds from brokerage sales — stocks, ETFs, mutual funds',                     where: 'Income → Capital Gains & Losses',              alwaysShow: false },
+		{ id: '1098',       doc: '1098',                   description: 'Mortgage interest statement from your lender (use their exact figure)',           where: 'Deductions → Mortgage Interest Paid',          alwaysShow: false },
+		{ id: '1098t',      doc: '1098-T',                 description: 'Tuition statement from your college or university',                               where: 'Credits → Education Credits (Form 8863)',      alwaysShow: false },
+		{ id: '1098e',      doc: '1098-E',                 description: 'Student loan interest paid to your servicer',                                    where: 'Deductions → Student Loan Interest',           alwaysShow: false },
+		{ id: '1095a',      doc: '1095-A',                 description: 'Health Insurance Marketplace Statement — required for ACA coverage reconciliation', where: 'Health Insurance → Marketplace Coverage',      alwaysShow: false },
+		{ id: 'estimates',  doc: 'Estimated Payment Records', description: 'Quarterly federal & state tax payment confirmations (IRS/state portal)',       where: 'Payments → Estimated Tax Payments',            alwaysShow: false },
+		{ id: 'charity',    doc: 'Donation Receipts',      description: 'Written acknowledgment required for any single donation ≥ $250',                 where: 'Deductions → Charitable Contributions',        alwaysShow: false },
+		{ id: 'mileage',    doc: 'Mileage Log',            description: 'Business, medical, or charity mileage records with dates and purposes',          where: 'Schedule C → Vehicle Expenses / Schedule A',  alwaysShow: false },
+		{ id: 'retirement', doc: 'IRA / HSA Statements',  description: 'Contribution confirmations for Traditional IRA, SEP-IRA, Solo 401(k), or HSA',   where: 'Deductions → Retirement Contributions',        alwaysShow: false },
+	];
+
+	const checklistDetected = $derived.by((): Set<string> => {
+		const d = new Set<string>();
+		d.add('w2');
+
+		if (businessSummary.some((b) => b.income > 0)) d.add('1099nec');
+
+		const processorRe = /\b(paypal|venmo|stripe|square|cash.?app|shopify|zelle|apple.?pay|google.?pay)\b/i;
+		if (txs.value.some((t) => t.amount > 0 && processorRe.test(`${t.payee} ${t.notes}`))) d.add('1099k');
+
+		const interestRe = /\b(interest|savings|high.?yield|apy|money.?market|credit.?union)\b/i;
+		if (txs.value.some((t) => t.amount > 0 && interestRe.test(`${t.payee} ${t.notes}`))) d.add('1099int');
+
+		const dividendRe = /\b(dividend|vanguard|fidelity|schwab|e.?trade|td.?ameritrade|robinhood|merrill|wealthfront|betterment)\b/i;
+		if (txs.value.some((t) => t.amount > 0 && dividendRe.test(`${t.payee} ${t.notes}`))) d.add('1099div');
+
+		const brokerageRe = /\b(proceeds|capital.?gain|brokerage.?sale|sold.+shares?|stock.+sold)\b/i;
+		if (txs.value.some((t) => brokerageRe.test(`${t.payee} ${t.notes}`))) d.add('1099b');
+
+		if (mortgageTotal > 0) d.add('1098');
+		if (educationTotal > 0) d.add('1098t');
+
+		const studentLoanRe = /\b(student.?loan|navient|sallie.?mae|great.?lakes|mohela|aidvantage|nelnet|edfinancial)\b/i;
+		if (txs.value.some((t) => studentLoanRe.test(`${t.payee} ${t.notes}`))) d.add('1098e');
+
+		const marketplaceRe = /\b(healthcare\.gov|marketplace|aca.?plan|health.?exchange|cobra)\b/i;
+		if (txs.value.some((t) => t.amount < 0 && marketplaceRe.test(`${t.payee} ${t.notes}`))) d.add('1095a');
+
+		if (federalEstimatedTotal > 0 || stateEstimatedTotal > 0) d.add('estimates');
+		if (charityTxs.some((t) => -t.amount >= 250)) d.add('charity');
+		if (mileageBuckets.business.miles > 0 || mileageBuckets.medical.miles > 0 || mileageBuckets.charity.miles > 0) d.add('mileage');
+		if (retirementBuckets.some((b) => b.total > 0)) d.add('retirement');
+
+		return d;
+	});
+
+	const checklistItems = $derived(TAX_DOCS.filter((d) => d.alwaysShow || checklistDetected.has(d.id)));
+
+	let checkedDocs = $state<Set<string>>(new Set());
+	$effect(() => {
+		(async () => {
+			const v = await db.settings.get(`checklist_${year}`);
+			checkedDocs = new Set(Array.isArray(v?.value) ? (v.value as string[]) : []);
+		})();
+	});
+	async function toggleDoc(id: string) {
+		const next = new Set(checkedDocs);
+		if (next.has(id)) next.delete(id); else next.add(id);
+		checkedDocs = next;
+		await db.settings.put({ key: `checklist_${year}`, value: Array.from(next) });
+	}
+	const checklistProgress = $derived({
+		checked: checklistItems.filter((d) => checkedDocs.has(d.id)).length,
+		total: checklistItems.length
+	});
+
 	// === AGI (user-supplied, persisted to settings) ===
 	let agi = $state(0);
 	$effect(() => {
@@ -342,6 +422,8 @@
 	}
 	const medicalThreshold = $derived(agi > 0 ? agi * 0.075 : 0);
 	const medicalDeductible = $derived(agi > 0 ? Math.max(0, medicalTotal - medicalThreshold) : 0);
+
+	let showFilingSection = $state(false);
 
 	// === Drilldown expansion state ===
 	let expanded = $state<Set<string>>(new Set());
@@ -596,6 +678,78 @@
 </PageHeader>
 
 <div class="space-y-6 p-4 md:p-8">
+	<!-- Ready-to-file accordion (document checklist + refund estimator) -->
+	<section class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<!-- Accordion header -->
+		<button
+			class="flex w-full items-center justify-between gap-3 p-5 text-left"
+			onclick={() => (showFilingSection = !showFilingSection)}
+			aria-expanded={showFilingSection}
+		>
+			<div class="min-w-0 flex-1">
+				<h2 class="text-lg font-semibold">Tax Filing Document Checklist</h2>
+				<p class="mt-1 text-xs text-slate-500">{checklistProgress.checked}/{checklistProgress.total} documents collected</p>
+			</div>
+			<svg
+				class="h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200 {showFilingSection ? 'rotate-180' : ''}"
+				viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+			>
+				<path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+			</svg>
+		</button>
+
+		{#if showFilingSection}
+			<div class="border-t border-slate-200 px-5 pb-5 pt-4 dark:border-slate-800">
+
+				<!-- Checklist -->
+				<p class="mb-3 text-xs text-slate-500">
+					Tax documents inferred from your {year} transactions. Check each off as you collect it, then open FreeTaxUSA.
+				</p>
+				<div class="mb-4">
+					<div class="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+						<div
+							class="h-full transition-all duration-300 {checklistProgress.checked === checklistProgress.total && checklistProgress.total > 0 ? 'bg-green-500' : 'bg-brand-500'}"
+							style="width:{checklistProgress.total > 0 ? (checklistProgress.checked / checklistProgress.total) * 100 : 0}%"
+						></div>
+					</div>
+					{#if checklistProgress.checked === checklistProgress.total && checklistProgress.total > 0}
+						<p class="mt-1.5 text-xs font-medium text-green-600 dark:text-green-400">All documents collected — you're ready to file!</p>
+					{/if}
+				</div>
+				<ul class="divide-y divide-slate-100 dark:divide-slate-800">
+					{#each checklistItems as item (item.id)}
+						{@const isChecked = checkedDocs.has(item.id)}
+						{@const isDetected = checklistDetected.has(item.id) && !item.alwaysShow}
+						<li class="flex items-start gap-3 py-3">
+							<button
+								class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors {isChecked ? 'border-brand-500 bg-brand-500 text-white' : 'border-slate-300 bg-white hover:border-brand-400 dark:border-slate-600 dark:bg-slate-900'}"
+								onclick={() => toggleDoc(item.id)}
+								aria-label={isChecked ? `Uncheck ${item.doc}` : `Check ${item.doc}`}
+							>
+								{#if isChecked}
+									<svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+										<path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+									</svg>
+								{/if}
+							</button>
+							<div class="min-w-0 flex-1">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="font-medium {isChecked ? 'text-slate-400 line-through' : ''}">{item.doc}</span>
+									{#if isDetected}
+										<span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Detected</span>
+									{/if}
+								</div>
+								<p class="mt-0.5 text-xs text-slate-500 {isChecked ? 'line-through' : ''}">{item.description}</p>
+								<p class="mt-0.5 text-[11px] text-slate-400">FreeTaxUSA: {item.where}</p>
+							</div>
+						</li>
+					{/each}
+				</ul>
+
+			</div>
+		{/if}
+	</section>
+
 	<!-- Schedule C per business -->
 	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 		<div class="mb-4 flex items-start justify-between gap-2">
