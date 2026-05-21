@@ -6,7 +6,15 @@ declare global {
 		// interface Locals {}
 		// interface PageData {}
 		// interface PageState {}
-		// interface Platform {}
+		interface Platform {
+			env?: {
+				AZURE_DOC_INTEL_ENDPOINT?: string;
+				AZURE_DOC_INTEL_KEY?: string;
+				AZURE_DOC_INTEL_MODEL?: string;
+				AZURE_DOC_INTEL_API_VERSION?: string;
+				ALLOWED_ORIGINS?: string;
+			};
+		}
 	}
 }
 

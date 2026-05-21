@@ -12,7 +12,6 @@
 	import ReceiptLightbox from '$lib/components/ReceiptLightbox.svelte';
 	import { compressImage } from '$lib/utils/image';
 	import { scanReceiptWithAzure } from '$lib/utils/receiptOcr';
-	import { getAzureConfig } from '$lib/db/azure';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
@@ -148,30 +147,36 @@
 			});
 			form.receiptBlob = compressed;
 
-			// If Azure is configured, scan the receipt and pre-fill the form.
-			const cfg = await getAzureConfig();
-			if (cfg) {
-				receiptScanStatus = { ok: true, message: 'Scanning receipt…' };
-				try {
-					const result = await scanReceiptWithAzure(compressed);
-					const parts: string[] = [];
-					if (result.merchant && !form.payee.trim()) {
-						form.payee = result.merchant;
-						parts.push(`payee → ${result.merchant}`);
-					}
-					if (typeof result.total === 'number' && result.total > 0 && form.amount === 0) {
-						form.amount = result.total;
-						parts.push(`amount → $${result.total.toFixed(2)}`);
-					}
-					if (result.date && /^\d{4}-\d{2}-\d{2}$/.test(result.date)) {
-						form.date = result.date;
-						parts.push(`date → ${result.date}`);
-					}
-					receiptScanStatus = parts.length
-						? { ok: true, message: `Filled ${parts.join(', ')}. Confirm before saving.` }
-						: { ok: true, message: 'Receipt scanned, but no fields could be extracted. Fill in manually.' };
-				} catch (err) {
-					receiptScanStatus = { ok: false, message: `OCR failed: ${(err as Error).message}` };
+			// Always try the OCR proxy. It returns 503 if the deployment hasn't
+			// been configured with Azure credentials — we treat that as "OCR
+			// unavailable, fill in manually."
+			receiptScanStatus = { ok: true, message: 'Scanning receipt…' };
+			try {
+				const result = await scanReceiptWithAzure(compressed);
+				const parts: string[] = [];
+				if (result.merchant && !form.payee.trim()) {
+					form.payee = result.merchant;
+					parts.push(`payee → ${result.merchant}`);
+				}
+				if (typeof result.total === 'number' && result.total > 0 && form.amount === 0) {
+					form.amount = result.total;
+					parts.push(`amount → $${result.total.toFixed(2)}`);
+				}
+				if (result.date && /^\d{4}-\d{2}-\d{2}$/.test(result.date)) {
+					form.date = result.date;
+					parts.push(`date → ${result.date}`);
+				}
+				receiptScanStatus = parts.length
+					? { ok: true, message: `Filled ${parts.join(', ')}. Confirm before saving.` }
+					: { ok: true, message: 'Receipt scanned, but no fields could be extracted. Fill in manually.' };
+			} catch (err) {
+				const message = (err as Error).message;
+				// If OCR isn't configured at all, stay quiet — the user still has
+				// their image attached and can type the details in.
+				if (/not configured/i.test(message)) {
+					receiptScanStatus = null;
+				} else {
+					receiptScanStatus = { ok: false, message: `OCR failed: ${message}` };
 				}
 			}
 		} finally {
