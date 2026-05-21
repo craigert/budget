@@ -118,7 +118,7 @@ export const ALL_ICONS: string[] = ICON_GROUPS.flatMap((g) => g.icons);
 // Nav menu icons
 export const NAV_ICONS = {
 	home: 'general/home',
-	transactions: 'finance-ecommerce/coins-swap',
+	transactions: 'finance-ecommerce/currency-dollar-circle',
 	budgets: 'charts/bar-chart-03',
 	accounts: 'finance-ecommerce/wallet',
 	business: 'education/briefcase-01',
