@@ -49,7 +49,7 @@
 			class="text-lg font-semibold tracking-tight"
 			style="font-family: var(--bs-font-display); color: var(--bs-text); letter-spacing: -0.02em;"
 		>
-			Budget<span style="font-weight: 600; color: var(--bs-accent);">&nbsp;Sparrow</span>
+			Budget<span style="font-weight: 600; color: var(--bs-accent);">Sparrow</span>
 		</span>
 	</a>
 	<nav class="flex-1 space-y-1 overflow-y-auto px-3 pb-4">

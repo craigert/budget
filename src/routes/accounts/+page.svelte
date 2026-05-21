@@ -192,7 +192,7 @@
 							<div class="bs-mono shrink-0 text-right" style="font-size: 13.5px; font-weight: 500; color: {displayBal < 0 ? 'var(--bs-neg)' : 'var(--bs-text)'};">
 								{money(displayBal)}
 							</div>
-							<div class="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+							<div class="flex shrink-0 gap-1 opacity-30 transition-opacity group-hover:opacity-100">
 								<button class="rounded-md p-1.5" style="color: var(--bs-text-3);" onclick={() => openEdit(a)} aria-label="Edit">
 									<Icon name="general/edit-01" size={14} />
 								</button>
