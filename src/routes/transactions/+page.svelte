@@ -594,7 +594,7 @@
 							<div class="mt-0.5 truncate text-xs text-slate-500">{t.notes}</div>
 						{/if}
 					</div>
-					<div class="bs-mono w-24 shrink-0 text-right text-sm font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
+					<div class="w-24 shrink-0 text-right text-sm font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
 						{money(t.amount)}
 					</div>
 					<div class="flex shrink-0 items-center gap-1">
