@@ -51,6 +51,14 @@ export async function goalCurrent(goal: Goal): Promise<number> {
 		});
 		return Math.round((total - goal.baselineAmount) * 100) / 100;
 	}
+	if (goal.trackingMode === 'manual') {
+		if (goal.id == null) return 0;
+		let total = 0;
+		await db.goalContributions.where('goalId').equals(goal.id).each((c) => {
+			total += c.amount;
+		});
+		return Math.round(total * 100) / 100;
+	}
 	return 0;
 }
 

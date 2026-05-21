@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
-	import type { Account, Category, Goal, Transaction } from '$lib/db/types';
+	import type { Account, Category, Goal, GoalContribution, Transaction } from '$lib/db/types';
 	import { goalCurrent, goalProgress } from '$lib/db/goals';
+	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 	import { money } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -21,9 +22,21 @@
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
 	const txs = live<Transaction[]>(() => db.transactions.toArray(), []);
+	const contributions = live<GoalContribution[]>(
+		() => db.goalContributions.orderBy('date').reverse().toArray(),
+		[]
+	);
 
 	const categoryMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
 	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
+	const contributionsByGoal = $derived.by(() => {
+		const map = new Map<number, GoalContribution[]>();
+		for (const c of contributions.value) {
+			if (!map.has(c.goalId)) map.set(c.goalId, []);
+			map.get(c.goalId)!.push(c);
+		}
+		return map;
+	});
 
 	let currents = $state<Map<number, number>>(new Map());
 	$effect(() => {
@@ -32,6 +45,8 @@
 		accounts.value;
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		txs.value;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		contributions.value;
 		(async () => {
 			const next = new Map<number, number>();
 			for (const g of list) {
@@ -41,6 +56,31 @@
 			currents = next;
 		})();
 	});
+
+	// Manual contribution form
+	let showContribFor = $state<number | null>(null); // goalId
+	let contribForm = $state({ date: '', amount: 0, notes: '' });
+
+	function openContribForm(goalId: number) {
+		showContribFor = goalId;
+		contribForm = { date: new Date().toISOString().slice(0, 10), amount: 0, notes: '' };
+	}
+
+	async function saveContrib(goalId: number) {
+		if (!(contribForm.amount > 0)) return;
+		await db.goalContributions.add({
+			goalId,
+			date: contribForm.date,
+			amount: Number(contribForm.amount),
+			notes: contribForm.notes.trim(),
+			createdAt: Date.now()
+		} as GoalContribution);
+		showContribFor = null;
+	}
+
+	async function deleteContrib(id: number) {
+		await db.goalContributions.delete(id);
+	}
 
 	const totals = $derived.by(() => {
 		let saved = 0;
@@ -168,8 +208,10 @@
 							<div class="mt-0.5 truncate text-xs text-slate-500">
 								{#if g.trackingMode === 'account'}
 									{linkedAccountsLabel(g)}
-								{:else}
+								{:else if g.trackingMode === 'category'}
 									{categoryMap.get(g.categoryId ?? -1)?.name ?? 'Unlinked category'} contributions
+								{:else}
+									Manual contributions
 								{/if}
 							</div>
 						</div>
@@ -250,6 +292,76 @@
 						<p class="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
 							{g.notes}
 						</p>
+					{/if}
+
+					{#if g.trackingMode === 'manual'}
+						{@const goalContribs = contributionsByGoal.get(g.id!) ?? []}
+						<div class="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+							{#if goalContribs.length > 0}
+								<ul class="mb-2 divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+									{#each goalContribs.slice(0, 5) as c (c.id)}
+										<li class="flex items-center gap-2 px-3 py-1.5 text-xs">
+											<span class="w-20 shrink-0 text-slate-500">{c.date}</span>
+											<span class="flex-1 truncate text-slate-500">{c.notes || '—'}</span>
+											<span class="shrink-0 font-medium tabular-nums text-emerald-600 dark:text-emerald-400">+{money(c.amount)}</span>
+											<button
+												class="shrink-0 text-slate-300 hover:text-red-500"
+												onclick={() => deleteContrib(c.id!)}
+												aria-label="Delete contribution"
+											>×</button>
+										</li>
+									{/each}
+									{#if goalContribs.length > 5}
+										<li class="px-3 py-1.5 text-center text-xs text-slate-400">{goalContribs.length - 5} more…</li>
+									{/if}
+								</ul>
+							{/if}
+
+							{#if showContribFor === g.id}
+								<div class="rounded-lg border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-500/30 dark:bg-brand-500/10">
+									<div class="mb-2 flex gap-2">
+										<input
+											type="date"
+											bind:value={contribForm.date}
+											class="w-36 shrink-0 text-sm"
+										/>
+										<div class="relative flex-1">
+											<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+											<input
+												type="number"
+												step="0.01"
+												min="0"
+												bind:value={contribForm.amount}
+												use:clearOnFocus
+												placeholder="Amount"
+												class="w-full pl-6 text-sm"
+											/>
+										</div>
+									</div>
+									<input
+										type="text"
+										bind:value={contribForm.notes}
+										placeholder="Notes (optional)"
+										class="mb-2 w-full text-sm"
+									/>
+									<div class="flex gap-2">
+										<button
+											class="flex-1 rounded-md bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
+											onclick={() => saveContrib(g.id!)}
+										>Save</button>
+										<button
+											class="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+											onclick={() => (showContribFor = null)}
+										>Cancel</button>
+									</div>
+								</div>
+							{:else}
+								<button
+									class="w-full rounded-md border border-dashed border-slate-300 py-1.5 text-xs text-slate-500 hover:border-brand-400 hover:text-brand-600 dark:border-slate-700 dark:hover:border-brand-500"
+									onclick={() => openContribForm(g.id!)}
+								>+ Log contribution</button>
+							{/if}
+						</div>
 					{/if}
 				</li>
 			{/each}

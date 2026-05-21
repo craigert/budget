@@ -160,17 +160,30 @@
 				</button>
 				<button
 					type="button"
-					class="flex-1 rounded-r-md py-2 text-sm font-medium {form.trackingMode === 'category'
+					class="flex-1 py-2 text-sm font-medium {form.trackingMode === 'category'
 						? 'bg-brand-500 text-white'
 						: 'bg-transparent text-slate-700 dark:text-slate-300'}"
 					onclick={() => (form.trackingMode = 'category')}
 				>
-					Category contributions
+					Category
+				</button>
+				<button
+					type="button"
+					class="flex-1 rounded-r-md py-2 text-sm font-medium {form.trackingMode === 'manual'
+						? 'bg-brand-500 text-white'
+						: 'bg-transparent text-slate-700 dark:text-slate-300'}"
+					onclick={() => (form.trackingMode = 'manual')}
+				>
+					Manual
 				</button>
 			</div>
 		</div>
 
-		{#if form.trackingMode === 'account'}
+		{#if form.trackingMode === 'manual'}
+			<p class="rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-500 dark:border-slate-700">
+				Log contributions directly on the goal card. Progress is the sum of everything you've recorded.
+			</p>
+		{:else if form.trackingMode === 'account'}
 			<div>
 				<div class="mb-1 flex items-baseline justify-between">
 					<span class="block text-sm font-medium">Linked accounts</span>

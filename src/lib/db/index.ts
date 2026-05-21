@@ -4,6 +4,7 @@ import type {
 	Business,
 	Category,
 	Goal,
+	GoalContribution,
 	Mileage,
 	Transaction,
 	Budget,
@@ -20,6 +21,7 @@ export class BudgetDB extends Dexie {
 	mileage!: Table<Mileage, number>;
 	/** Stored under the legacy `nestEggs` table name; user-facing term is "Goals". */
 	nestEggs!: Table<Goal, number>;
+	goalContributions!: Table<GoalContribution, number>;
 
 	constructor() {
 		super('budget');
@@ -96,6 +98,11 @@ export class BudgetDB extends Dexie {
 		// v5: nest eggs (savings goals)
 		this.version(5).stores({
 			nestEggs: '++id, name, archived, sortOrder, deadline, createdAt'
+		});
+
+		// v6: manual goal contributions
+		this.version(6).stores({
+			goalContributions: '++id, goalId, date, createdAt'
 		});
 	}
 }

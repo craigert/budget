@@ -51,7 +51,7 @@ export interface Business {
 	createdAt: number;
 }
 
-export type GoalTrackingMode = 'account' | 'category';
+export type GoalTrackingMode = 'account' | 'category' | 'manual';
 
 export interface Goal {
 	id?: number;
@@ -71,6 +71,15 @@ export interface Goal {
 	notes: string;
 	archived: number;
 	sortOrder: number;
+	createdAt: number;
+}
+
+export interface GoalContribution {
+	id?: number;
+	goalId: number;
+	date: string; // YYYY-MM-DD
+	amount: number; // positive
+	notes: string;
 	createdAt: number;
 }
 
