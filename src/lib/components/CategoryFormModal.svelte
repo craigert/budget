@@ -56,7 +56,7 @@
 					color: '#64748b'
 				};
 			}
-			isOneTime = false;
+			isOneTime = editing ? editing.tempMonth != null : false;
 			budgetAmount = 0;
 		}
 	});
@@ -72,7 +72,10 @@
 		};
 		let id: number;
 		if (editing?.id) {
-			await db.categories.update(editing.id, payload);
+			const tempMonth = isOneTime
+				? (editing.tempMonth ?? forMonth ?? null)
+				: null;
+			await db.categories.update(editing.id, { ...payload, tempMonth });
 			id = editing.id;
 		} else {
 			const maxSort = await db.categories
@@ -125,12 +128,12 @@
 			</div>
 		{/if}
 
-		{#if !editing && forMonth}
+		{#if forMonth}
 			<label class="flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors {isOneTime ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}">
 				<input type="checkbox" bind:checked={isOneTime} class="shrink-0 rounded" />
 				<div>
 					<div class="text-sm font-medium">One-time category</div>
-					<div class="text-xs text-slate-500">Only appears in the budget view for this month — won't show in future months</div>
+					<div class="text-xs text-slate-500">Only appears in the budget view for {editing?.tempMonth ?? forMonth} — won't show in other months</div>
 				</div>
 				{#if isOneTime}
 					<span class="ml-auto shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">1×</span>

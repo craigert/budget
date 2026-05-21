@@ -26,7 +26,7 @@
 	);
 	const income = $derived(
 		categories.value
-			.filter((c) => c.archived === 0 && c.kind === 'income')
+			.filter((c) => c.archived === 0 && c.kind === 'income' && (c.tempMonth == null || c.tempMonth === month))
 			.sort((a, b) => a.sortOrder - b.sortOrder)
 	);
 	const archived = $derived(categories.value.filter((c) => c.archived === 1));
@@ -218,7 +218,7 @@
 							</div>
 							<div class="flex-1 truncate font-medium">{c.name}</div>
 							{#if isTemp}
-								<span class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Temporary — won't copy to other months">1×</span>
+								<span class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Temporary — won't copy to other months">One-time expense</span>
 							{/if}
 							<div class="relative w-28 shrink-0">
 								<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
@@ -295,6 +295,9 @@
 							<Icon name={c.icon} size={20} />
 						</div>
 						<div class="flex-1 truncate font-medium">{c.name}</div>
+						{#if c.tempMonth != null}
+							<span class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Temporary — won't copy to other months">One-time income</span>
+						{/if}
 						<div class="flex shrink-0 gap-1 opacity-60 transition-opacity group-hover:opacity-100">
 							<button
 								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
