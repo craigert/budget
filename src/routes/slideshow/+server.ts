@@ -69,7 +69,7 @@ const html = `<!DOCTYPE html>
   <div style="padding-top:60px;">
     <div class="eyebrow">Personal Finance App</div>
     <div class="wordmark">Budget<span class="sp">&nbsp;Sparrow</span></div>
-    <p style="margin-top:1.2rem;font-size:1.2rem;color:var(--text2);max-width:520px;">One place to track your accounts, transactions, budgets, and goals — private by default, no cloud required.</p>
+    <p style="margin-top:1.2rem;font-size:1.2rem;color:var(--text2);max-width:520px;">One place to track your accounts, transactions, budgets, and goals — everything you need to stay on top of your finances.</p>
     <div style="margin-top:2.2rem;display:flex;gap:10px;flex-wrap:wrap;">
       <span class="pill pill-brand">Accounts</span>
       <span class="pill pill-accent">Transactions</span>
@@ -87,12 +87,12 @@ const html = `<!DOCTYPE html>
     <ul class="feat-list">
       <li><span class="feat-icon">🏦</span><span>Bank apps show one account at a time</span></li>
       <li><span class="feat-icon">📊</span><span>Spreadsheets are powerful but tedious</span></li>
-      <li><span class="feat-icon">☁️</span><span>Cloud tools share your data with third parties</span></li>
       <li><span class="feat-icon">💼</span><span>Personal and business spending blur together</span></li>
+      <li><span class="feat-icon">🧾</span><span>Tax time means hunting through months of records</span></li>
     </ul>
     <div class="card">
       <div class="card-label">What you need</div>
-      <p style="font-size:0.9rem;margin:0;color:var(--text2);">One clean view across all accounts, with budgets you actually stick to — stored locally so your data stays yours.</p>
+      <p style="font-size:0.9rem;margin:0;color:var(--text2);">One clean view across all accounts, with budgets you actually stick to — and tax summaries ready when you need them.</p>
     </div>
   </div>
 </section>
@@ -133,7 +133,6 @@ const html = `<!DOCTYPE html>
     <ul>
       <li>Search by payee, notes, or category</li>
       <li>Filter by account, date range, or category</li>
-      <li>Pending vs. cleared status</li>
       <li>📸 Snap a receipt — OCR fills in the details</li>
       <li>Export filtered results to CSV</li>
     </ul>
@@ -267,7 +266,7 @@ const html = `<!DOCTYPE html>
     <ul class="feat-list">
       <li><span class="feat-icon">📲</span><span><strong style="color:var(--text);">Installable PWA</strong> — add to home screen on iOS, Android, or desktop</span></li>
       <li><span class="feat-icon">📸</span><span><strong style="color:var(--text);">Receipt scanning</strong> — snap a photo, OCR auto-fills payee, amount &amp; date</span></li>
-      <li><span class="feat-icon">📶</span><span><strong style="color:var(--text);">Works offline</strong> — all data is local, no internet needed after install</span></li>
+      <li><span class="feat-icon">📶</span><span><strong style="color:var(--text);">Works offline</strong> — install once, use anywhere without an internet connection</span></li>
       <li><span class="feat-icon">👆</span><span><strong style="color:var(--text);">Bottom nav</strong> — one-thumb navigation on mobile with all 5 sections</span></li>
       <li><span class="feat-icon">🌙</span><span><strong style="color:var(--text);">Dark mode</strong> — follows system preference automatically</span></li>
     </ul>
@@ -292,25 +291,44 @@ const html = `<!DOCTYPE html>
 </section>
 
 <section>
-  <h3>Privacy &amp; architecture</h3>
-  <h2>Your data stays <span class="brand">with you</span></h2>
-  <div class="two-col" style="margin-top:1.8rem;align-items:start;">
-    <ul class="feat-list">
-      <li><span class="feat-icon">🔒</span><span><strong style="color:var(--text);">100% local storage</strong> — all data lives in your browser's IndexedDB via Dexie.js. Nothing is transmitted.</span></li>
-      <li><span class="feat-icon">🚫</span><span><strong style="color:var(--text);">No account required</strong> — no sign-up, no email, no password.</span></li>
-      <li><span class="feat-icon">📤</span><span><strong style="color:var(--text);">Export any time</strong> — download your transactions as CSV whenever you want.</span></li>
-      <li><span class="feat-icon">🧩</span><span><strong style="color:var(--text);">Open codebase</strong> — built with SvelteKit, fully inspectable and self-hostable.</span></li>
-    </ul>
-    <div class="card">
-      <div class="card-label">Tech stack</div>
-      <hr class="divider" />
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
-        <span class="pill pill-brand">SvelteKit 2</span>
-        <span class="pill pill-muted">Svelte 5 Runes</span>
-        <span class="pill pill-accent">Dexie.js (IndexedDB)</span>
-        <span class="pill pill-muted">Tailwind CSS 4</span>
-        <span class="pill pill-muted">TypeScript</span>
-        <span class="pill pill-muted">Vite PWA</span>
+  <h3>Feature 7</h3>
+  <h2>Taxes — <span class="accent">ready when April comes</span></h2>
+  <div class="two-col" style="margin-top:1.4rem;">
+    <div>
+      <p style="margin-bottom:1rem;">Budget Sparrow turns your year of transactions into a tax prep head start — no extra data entry required.</p>
+      <ul>
+        <li>Schedule C summary per business — income, expenses bucketed by category</li>
+        <li>Mileage log with IRS standard rate calculation</li>
+        <li>Charitable donations auto-detected from transactions</li>
+        <li>Medical expenses, SALT, and mortgage interest totals</li>
+        <li>Year selector to review any prior tax year</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:0.8rem;padding:16px 18px;">
+        <div class="card-label">Schedule C · Acme LLC · 2026</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;margin-bottom:12px;">
+          <span style="font-size:0.85rem;color:var(--text2);">Gross income</span>
+          <span class="pos" style="font-weight:600;font-size:1rem;">$62,400</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text3);margin-bottom:6px;">Expenses</div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text2);padding:5px 0;border-top:0.5px solid var(--border);">
+          <span>Administrative</span><span>$3,210</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text2);padding:5px 0;border-top:0.5px solid var(--border);">
+          <span>Operations</span><span>$8,740</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text2);padding:5px 0;border-top:0.5px solid var(--border);">
+          <span>Vehicle &amp; mileage</span><span>$1,890</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.9rem;font-weight:600;padding:8px 0;border-top:0.5px solid var(--border);margin-top:4px;">
+          <span style="color:var(--text);">Net profit</span><span class="pos">$48,560</span>
+        </div>
+      </div>
+      <div class="three-col" style="gap:0.8rem;">
+        <div class="card" style="padding:12px 14px;"><div class="card-label" style="font-size:0.62rem;">Mileage</div><div style="font-size:1.1rem;font-weight:700;color:var(--text);">1,240 mi</div><div style="font-size:0.68rem;color:var(--text3);margin-top:2px;">$806 deduction</div></div>
+        <div class="card" style="padding:12px 14px;"><div class="card-label" style="font-size:0.62rem;">Charitable</div><div style="font-size:1.1rem;font-weight:700;color:var(--text);">$2,350</div><div style="font-size:0.68rem;color:var(--text3);margin-top:2px;">Sch. A line 11</div></div>
+        <div class="card" style="padding:12px 14px;"><div class="card-label" style="font-size:0.62rem;">SALT cap</div><div style="font-size:1.1rem;font-weight:700;color:var(--text);">$10,000</div><div style="font-size:0.68rem;color:var(--text3);margin-top:2px;">Max deductible</div></div>
       </div>
     </div>
   </div>
@@ -320,13 +338,13 @@ const html = `<!DOCTYPE html>
   <div style="padding-top:50px;text-align:center;display:flex;flex-direction:column;align-items:center;">
     <div class="eyebrow" style="text-align:center;">Budget Sparrow</div>
     <h1 style="font-size:3.6rem;text-align:center;max-width:700px;margin:0 auto;">Your money.<br/><span class="accent">Your rules.</span></h1>
-    <p style="margin-top:1.4rem;max-width:500px;text-align:center;color:var(--text2);font-size:1.1rem;">A privacy-first, local-only personal finance app that works on any device — no subscription, no account, no compromise.</p>
+    <p style="margin-top:1.4rem;max-width:500px;text-align:center;color:var(--text2);font-size:1.1rem;">A personal finance app that works on any device — no subscription, no account, no compromise.</p>
     <div style="margin-top:2rem;display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
       <span class="pill pill-pos">✓ Accounts &amp; Net Worth</span>
       <span class="pill pill-pos">✓ Transactions &amp; Receipts</span>
       <span class="pill pill-pos">✓ Business Mode</span>
       <span class="pill pill-pos">✓ Budgets &amp; Goals</span>
-      <span class="pill pill-pos">✓ Offline PWA</span>
+      <span class="pill pill-pos">✓ Tax Summaries</span>
     </div>
   </div>
 </section>
