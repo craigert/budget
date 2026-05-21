@@ -4,6 +4,8 @@
 	import { bootstrap } from '$lib/db/bootstrap';
 	import { theme } from '$lib/theme.svelte';
 	import Nav from '$lib/components/Nav.svelte';
+	import PwaUpdateToast from '$lib/components/PwaUpdateToast.svelte';
+	import IosInstallHint from '$lib/components/IosInstallHint.svelte';
 
 	let { children } = $props();
 	let ready = $state(false);
@@ -32,3 +34,6 @@
 		{/if}
 	</main>
 </div>
+
+<PwaUpdateToast />
+<IosInstallHint />
