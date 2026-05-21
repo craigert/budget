@@ -333,22 +333,23 @@
 			onpointerleave={onPointerLeave}
 		>
 			<defs>
+				<!-- Area gradient — reads stroke from --bs-brand so it flips with the theme.
+				     Light = deep navy fading; dark = pale lavender fading. -->
 				<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-					<stop offset="0%" stop-color="currentColor" stop-opacity="0.28" class="text-brand-600" />
-					<stop offset="60%" stop-color="currentColor" stop-opacity="0.06" class="text-brand-600" />
-					<stop offset="100%" stop-color="currentColor" stop-opacity="0" class="text-brand-600" />
+					<stop offset="0%" stop-color="var(--bs-brand)" stop-opacity="0.28" />
+					<stop offset="60%" stop-color="var(--bs-brand)" stop-opacity="0.06" />
+					<stop offset="100%" stop-color="var(--bs-brand)" stop-opacity="0" />
 				</linearGradient>
 			</defs>
 
-			<!-- Y grid lines (labels are rendered as HTML below so they scale crisply on mobile) -->
+			<!-- Y grid lines — hairline border tone, theme-aware -->
 			{#each yTicks as t (t.value)}
 				<line
 					x1={padL}
 					y1={t.y}
 					x2={W - padR}
 					y2={t.y}
-					stroke="currentColor"
-					class="text-slate-100 dark:text-slate-800/60"
+					stroke="var(--bs-border)"
 					stroke-width="1.5"
 				/>
 			{/each}
@@ -360,13 +361,12 @@
 				style="opacity:{mounted ? 1 : 0}; transition: opacity 0.7s ease-out 0.5s;"
 			/>
 
-			<!-- Line -->
+			<!-- Line — reads --bs-brand. Dark navy in light mode, pale lavender in dark. -->
 			<path
 				bind:this={pathEl}
 				d={linePath}
 				fill="none"
-				stroke="currentColor"
-				class="text-brand-600"
+				stroke="var(--bs-brand)"
 				stroke-width="4"
 				stroke-linecap="round"
 				stroke-linejoin="round"
@@ -381,9 +381,8 @@
 					cx={x(i)}
 					cy={y(p.value)}
 					r={isLatest ? dotRadiusLatest : dotRadius}
-					fill="white"
-					stroke="currentColor"
-					class="text-brand-600"
+					fill="var(--bs-surface)"
+					stroke="var(--bs-brand)"
 					stroke-width={dotStrokeWidth}
 					style="opacity:{mounted ? 1 : 0}; transition: opacity 0.35s ease-out {0.4 + (i / Math.max(1, points.length)) * 0.7}s;"
 				/>
@@ -396,8 +395,7 @@
 					y1={padT}
 					x2={x(hoverIdx)}
 					y2={padT + innerH}
-					stroke="currentColor"
-					class="text-slate-300 dark:text-slate-600"
+					stroke="var(--bs-border-2)"
 					stroke-width="2"
 					stroke-dasharray="6 6"
 				/>
@@ -405,9 +403,8 @@
 					cx={x(hoverIdx)}
 					cy={y(hoverPoint.value)}
 					r={isMobile ? 20 : 11}
-					fill="white"
-					stroke="currentColor"
-					class="text-brand-600"
+					fill="var(--bs-surface)"
+					stroke="var(--bs-brand)"
 					stroke-width={dotStrokeWidth}
 				/>
 			{/if}
