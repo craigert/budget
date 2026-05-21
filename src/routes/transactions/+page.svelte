@@ -525,12 +525,7 @@
 						{#if cat?.icon}<Icon name={cat.icon} size={20} />{:else}<span>·</span>{/if}
 					</div>
 					<div class="min-w-0 flex-1">
-						<div class="flex items-baseline justify-between gap-2">
-							<div class="truncate font-medium">{t.payee || '(no payee)'}</div>
-							<div class="shrink-0 font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
-								{money(t.amount)}
-							</div>
-						</div>
+						<div class="truncate font-medium">{t.payee || '(no payee)'}</div>
 						<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
 							<span>{formatDate(t.date)}</span>
 							<span aria-hidden>·</span>
@@ -550,6 +545,9 @@
 						{#if t.notes}
 							<div class="mt-0.5 truncate text-xs text-slate-500">{t.notes}</div>
 						{/if}
+					</div>
+					<div class="bs-mono w-24 shrink-0 text-right text-sm font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
+						{money(t.amount)}
 					</div>
 					<div class="flex shrink-0 items-center gap-1">
 						{#if businesses.value.length > 0}
