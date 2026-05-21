@@ -10,8 +10,6 @@
 		{ href: '/transactions', label: 'Transactions', icon: NAV_ICONS.transactions },
 		{ href: '/budgets', label: 'Budgets', icon: NAV_ICONS.budgets },
 		{ href: '/accounts', label: 'Accounts', icon: NAV_ICONS.accounts },
-		{ href: '/goals', label: 'Goals', icon: NAV_ICONS.goals },
-		{ href: '/business', label: 'Business', icon: NAV_ICONS.business },
 		{ href: '/taxes', label: 'Taxes', icon: NAV_ICONS.taxes }
 	];
 	const settingsItem = { href: '/settings', label: 'Settings', icon: NAV_ICONS.settings };

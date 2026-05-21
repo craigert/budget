@@ -9,6 +9,8 @@ export interface Account {
 	openingBalance: number;
 	currency: string;
 	archived: number; // 0 | 1 — Dexie can't index booleans
+	/** null = Personal; a Business id = assigned to that business */
+	businessId: number | null;
 	createdAt: number;
 }
 

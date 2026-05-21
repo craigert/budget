@@ -1,14 +1,18 @@
 <script lang="ts">
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
-	import type { Budget, Category, CategoryKind } from '$lib/db/types';
+	import type { Budget, Category, CategoryKind, Goal, GoalContribution, Transaction } from '$lib/db/types';
 	import { spendingByCategory, incomingByCategory } from '$lib/db/queries';
+	import { goalCurrent, goalProgress } from '$lib/db/goals';
 	import { money, thisMonth, addMonths, monthLabel } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import CategoryFormModal from '$lib/components/CategoryFormModal.svelte';
+	import GoalFormModal from '$lib/components/GoalFormModal.svelte';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
+
+	// ── Budget ────────────────────────────────────────────────────────────────
 
 	let month = $state(thisMonth());
 
@@ -25,22 +29,12 @@
 
 	const expense = $derived(
 		categories.value
-			.filter(
-				(c) =>
-					c.archived === 0 &&
-					c.kind === 'expense' &&
-					(c.tempMonth == null || c.tempMonth === month)
-			)
+			.filter((c) => c.archived === 0 && c.kind === 'expense' && (c.tempMonth == null || c.tempMonth === month))
 			.sort((a, b) => a.sortOrder - b.sortOrder)
 	);
 	const income = $derived(
 		categories.value
-			.filter(
-				(c) =>
-					c.archived === 0 &&
-					c.kind === 'income' &&
-					(c.tempMonth == null || c.tempMonth === month)
-			)
+			.filter((c) => c.archived === 0 && c.kind === 'income' && (c.tempMonth == null || c.tempMonth === month))
 			.sort((a, b) => a.sortOrder - b.sortOrder)
 	);
 	const archived = $derived(categories.value.filter((c) => c.archived === 1));
@@ -49,12 +43,7 @@
 	const spendMap = $derived(new Map(spending.value.map((s) => [s.categoryId, s.total])));
 	const incomeMap = $derived(new Map(incomeReceived.value.map((i) => [i.categoryId, i.total])));
 
-	// Pending budget edit — also doubles as the "new budget" form when categoryId is fresh.
-	let pendingChange = $state<{
-		categoryId: number;
-		categoryName: string;
-		amount: number;
-	} | null>(null);
+	let pendingChange = $state<{ categoryId: number; categoryName: string; amount: number } | null>(null);
 
 	function openEdit(c: Category) {
 		const current = budgetMap.get(c.id!)?.amount ?? 0;
@@ -139,7 +128,6 @@
 	const totalSpent = $derived(expense.reduce((s, c) => s + (spendMap.get(c.id!) ?? 0), 0));
 	const usedPct = $derived(totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0);
 
-	// Days left in this month — from the design's "14 days left" copy.
 	const daysLeftInMonth = $derived.by(() => {
 		const [y, m] = month.split('-').map(Number);
 		const last = new Date(y, m, 0).getDate();
@@ -148,7 +136,6 @@
 		return isCurrent ? last - today.getDate() : last;
 	});
 
-	// Category modal (add/edit category)
 	let showCategoryModal = $state(false);
 	let editingCategory = $state<Category | null>(null);
 	let defaultKind = $state<CategoryKind>('expense');
@@ -158,7 +145,6 @@
 		showCategoryModal = true;
 	}
 
-	// Compute card status (Close to limit / Over budget / X days left)
 	function statusFor(budgeted: number, spent: number) {
 		if (budgeted === 0) return { label: '', tone: 'idle' as const };
 		if (spent > budgeted) return { label: 'Over budget', tone: 'neg' as const };
@@ -166,11 +152,55 @@
 		if (pct >= 80) return { label: 'Close to limit', tone: 'warn' as const };
 		return { label: `${daysLeftInMonth} days left`, tone: 'idle' as const };
 	}
+
+	// ── Goals ─────────────────────────────────────────────────────────────────
+
+	const goals = live<Goal[]>(
+		() =>
+			db.nestEggs
+				.where('archived')
+				.equals(0)
+				.toArray()
+				.then((arr) => arr.sort((a, b) => a.sortOrder - b.sortOrder)),
+		[]
+	);
+	const txs = live<Transaction[]>(() => db.transactions.toArray(), []);
+	const contributions = live<GoalContribution[]>(
+		() => db.goalContributions.orderBy('date').reverse().toArray(),
+		[]
+	);
+
+	let currents = $state<Map<number, number>>(new Map());
+	$effect(() => {
+		const list = goals.value;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		txs.value;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		contributions.value;
+		(async () => {
+			const next = new Map<number, number>();
+			for (const g of list) {
+				if (g.id == null) continue;
+				next.set(g.id, await goalCurrent(g));
+			}
+			currents = next;
+		})();
+	});
+
+	let showGoalModal = $state(false);
+	let editingGoal = $state<Goal | null>(null);
+	function openCreateGoal() { editingGoal = null; showGoalModal = true; }
+	function openEditGoal(g: Goal) { editingGoal = g; showGoalModal = true; }
+
+	function formatTargetDate(iso: string | null): string {
+		if (!iso) return 'No target';
+		const [y, m, d] = iso.split('-').map(Number);
+		return `Target by ${new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
+	}
 </script>
 
 <PageHeader title="Budgets" eyebrow="{monthLabel(month).toUpperCase()} · {Math.round(usedPct)}% USED">
 	{#snippet actions()}
-		<!-- Month nav as a small pill cluster -->
 		<div
 			class="inline-flex items-center"
 			style="border: 0.5px solid var(--bs-border); border-radius: var(--bs-radius-sm); background: var(--bs-surface);"
@@ -181,27 +211,21 @@
 				class="px-2.5 py-1.5 text-sm transition-opacity hover:opacity-70"
 				style="color: var(--bs-text-2);"
 				aria-label="Previous month"
-			>
-				‹
-			</button>
+			>‹</button>
 			<button
 				type="button"
 				onclick={() => (month = thisMonth())}
 				class="px-2 py-1.5 text-sm font-medium transition-opacity hover:opacity-80"
 				style="color: var(--bs-text);"
 				title={month === thisMonth() ? '' : 'Jump to today'}
-			>
-				{monthLabel(month).split(' ')[0]}
-			</button>
+			>{monthLabel(month).split(' ')[0]}</button>
 			<button
 				type="button"
 				onclick={() => (month = addMonths(month, 1))}
 				class="px-2.5 py-1.5 text-sm transition-opacity hover:opacity-70"
 				style="color: var(--bs-text-2);"
 				aria-label="Next month"
-			>
-				›
-			</button>
+			>›</button>
 		</div>
 		<button
 			type="button"
@@ -216,7 +240,7 @@
 </PageHeader>
 
 <div class="space-y-6 p-4 md:p-8">
-	<!-- Headline overview card: big total / target with a horizontal progress bar -->
+	<!-- Headline overview -->
 	<section class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
 		<div class="section-label">{monthLabel(month).toUpperCase()} · {Math.round(usedPct)}% USED</div>
 		<div class="mt-2 flex flex-wrap items-baseline gap-2">
@@ -225,27 +249,17 @@
 				of <span style="color: var(--bs-text-2);">{money(totalBudgeted)}</span>
 			</span>
 		</div>
-		<div
-			class="mt-4 h-2 w-full overflow-hidden rounded-full"
-			style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);"
-		>
+		<div class="mt-4 h-2 w-full overflow-hidden rounded-full" style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);">
 			<div
 				class="h-full transition-all"
-				style="width: {Math.min(100, usedPct)}%; background: {usedPct > 100
-					? 'var(--bs-neg)'
-					: usedPct > 80
-						? 'var(--bs-warn)'
-						: 'var(--bs-brand)'};"
+				style="width: {Math.min(100, usedPct)}%; background: {usedPct > 100 ? 'var(--bs-neg)' : usedPct > 80 ? 'var(--bs-warn)' : 'var(--bs-brand)'};"
 			></div>
 		</div>
 	</section>
 
 	<!-- Expense category grid -->
 	{#if expense.length === 0}
-		<div
-			class="rounded-xl p-10 text-center"
-			style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);"
-		>
+		<div class="rounded-xl p-10 text-center" style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);">
 			<p style="color: var(--bs-text-2);">No categories yet. Add one to start budgeting.</p>
 			<div class="mt-4">
 				<Button onclick={() => openAddCategory('expense')}>+ Add category</Button>
@@ -264,7 +278,7 @@
 					<button
 						type="button"
 						onclick={() => openEdit(c)}
-						class="w-full text-left rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 transition-shadow hover:shadow-md"
+						class="w-full rounded-xl border border-slate-200 bg-white text-left transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
 					>
 						<div class="flex items-start gap-3">
 							<div
@@ -274,12 +288,7 @@
 								<Icon name={c.icon} size={18} />
 							</div>
 							<div class="min-w-0 flex-1">
-								<div
-									class="truncate text-sm font-medium"
-									style="color: var(--bs-text); font-size: 13.5px;"
-								>
-									{c.name}
-								</div>
+								<div class="truncate text-sm font-medium" style="color: var(--bs-text); font-size: 13.5px;">{c.name}</div>
 								<div class="truncate text-xs" style="font-size: 11.5px; color: {status.tone === 'neg' ? 'var(--bs-neg)' : status.tone === 'warn' ? 'var(--bs-warn)' : 'var(--bs-text-3)'};">
 									{status.label}
 								</div>
@@ -288,38 +297,23 @@
 								<span
 									class="bs-tag bs-mono"
 									style="background: color-mix(in oklch, {status.tone === 'neg' ? 'var(--bs-neg)' : status.tone === 'warn' ? 'var(--bs-warn)' : 'var(--bs-text-3)'} 12%, transparent); color: {status.tone === 'neg' ? 'var(--bs-neg)' : status.tone === 'warn' ? 'var(--bs-warn)' : 'var(--bs-text-2)'};"
-								>
-									{over ? 'Over' : `${Math.round(pct)}%`}
-								</span>
+								>{over ? 'Over' : `${Math.round(pct)}%`}</span>
 							{/if}
 						</div>
-
 						<div class="mt-4 flex items-baseline justify-between gap-2">
 							<span class="bs-kpi" style="font-size: 26px;">{money(spent)}</span>
-							<span class="bs-mono" style="font-size: 12px; color: var(--bs-text-3);">
-								/ {money(budgeted)}
-							</span>
+							<span class="bs-mono" style="font-size: 12px; color: var(--bs-text-3);">/ {money(budgeted)}</span>
 						</div>
-
-						<div
-							class="mt-3 h-1.5 w-full overflow-hidden rounded-full"
-							style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);"
-						>
-							<div
-								class="h-full transition-all"
-								style="width: {Math.min(100, pct)}%; background: {over ? 'var(--bs-neg)' : c.color};"
-							></div>
+						<div class="mt-3 h-1.5 w-full overflow-hidden rounded-full" style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);">
+							<div class="h-full transition-all" style="width: {Math.min(100, pct)}%; background: {over ? 'var(--bs-neg)' : c.color};"></div>
 						</div>
-
 						<div class="mt-3" style="font-size: 12px; color: var(--bs-text-3);">
 							{#if budgeted === 0 && spent === 0}
 								<span>No budget set · tap to add</span>
 							{:else if over}
-								<span class="bs-mono" style="color: var(--bs-neg);">{money(-remaining)}</span>
-								<span> over</span>
+								<span class="bs-mono" style="color: var(--bs-neg);">{money(-remaining)}</span><span> over</span>
 							{:else}
-								<span class="bs-mono" style="color: var(--bs-text-2);">{money(remaining)}</span>
-								<span> left this month</span>
+								<span class="bs-mono" style="color: var(--bs-text-2);">{money(remaining)}</span><span> left this month</span>
 							{/if}
 						</div>
 					</button>
@@ -328,7 +322,93 @@
 		</ul>
 	{/if}
 
-	<!-- Income categories — kept compact below the budget grid -->
+	<!-- Goals -->
+	<section>
+		<div class="mb-4 flex items-center justify-between">
+			<h2 class="text-base font-semibold" style="color: var(--bs-text);">Goals</h2>
+			<button
+				type="button"
+				onclick={openCreateGoal}
+				class="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-opacity hover:opacity-80"
+				style="background: var(--bs-surface-2); color: var(--bs-text-2); border: 0.5px solid var(--bs-border);"
+			>
+				<Icon name="general/plus" size={13} />
+				New goal
+			</button>
+		</div>
+
+		{#if goals.value.length === 0}
+			<div class="rounded-xl p-8 text-center" style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);">
+				<p class="text-sm" style="color: var(--bs-text-2);">No goals yet. Create one to start tracking savings.</p>
+			</div>
+		{:else}
+			<ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+				{#each goals.value as g (g.id)}
+					{@const current = currents.get(g.id!) ?? 0}
+					{@const p = goalProgress(g, current)}
+					{@const pct = Math.min(100, Math.max(0, p.percent))}
+					<li>
+						<button
+							type="button"
+							onclick={() => openEditGoal(g)}
+							class="w-full rounded-xl border border-slate-200 bg-white text-left transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+							title={g.notes || `${g.name} — click to edit`}
+						>
+							<div class="flex items-start gap-3">
+								<div
+									class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+									style="background: color-mix(in oklch, {g.color} 14%, var(--bs-surface)); color: {g.color}; border: 0.5px solid color-mix(in oklch, {g.color} 28%, transparent);"
+								>
+									<Icon name={g.icon} size={18} />
+								</div>
+								<div class="min-w-0 flex-1">
+									<div class="truncate text-sm font-medium" style="color: var(--bs-text); font-size: 13.5px;">{g.name}</div>
+									<div class="truncate text-xs" style="color: var(--bs-text-3); font-size: 11.5px;">{formatTargetDate(g.deadline)}</div>
+								</div>
+								<span class="bs-mono" style="font-size: 12px; color: var(--bs-text-2); white-space: nowrap;">{Math.round(p.percent)}%</span>
+							</div>
+							<div class="mt-3 flex items-baseline gap-1.5">
+								<span class="bs-kpi" style="font-size: 24px;">{money(current)}</span>
+								<span class="bs-mono" style="font-size: 12px; color: var(--bs-text-3);">/ {money(g.targetAmount)}</span>
+							</div>
+							<div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full" style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);">
+								<div class="h-full transition-all" style="width: {pct}%; background: {p.complete ? 'var(--bs-pos)' : 'var(--bs-brand)'};"></div>
+							</div>
+							<div class="mt-3 flex items-center justify-between">
+								<span class="bs-mono" style="font-size: 11.5px; color: var(--bs-text-3);">
+									{p.complete ? 'Reached' : `${money(p.remaining)} to go`}
+								</span>
+								<span
+									class="inline-flex items-center gap-1 rounded-full"
+									style="padding: 4px 9px; font-size: 11px; font-weight: 500; border: 0.5px solid var(--bs-border); background: var(--bs-surface); color: var(--bs-text-2);"
+								>
+									<Icon name="general/plus" size={11} />
+									Contribute
+								</span>
+							</div>
+						</button>
+					</li>
+				{/each}
+				<!-- Dashed + New goal tile -->
+				<li>
+					<button
+						type="button"
+						onclick={openCreateGoal}
+						class="flex h-full min-h-[180px] w-full flex-col items-center justify-center rounded-xl transition-colors"
+						style="border: 1px dashed var(--bs-border-2); background: transparent; color: var(--bs-text-2);"
+					>
+						<div class="mb-2 flex h-9 w-9 items-center justify-center rounded-lg" style="background: var(--bs-surface-2); color: var(--bs-text-2); border: 0.5px solid var(--bs-border);">
+							<Icon name="general/plus" size={18} />
+						</div>
+						<div class="text-sm font-medium" style="color: var(--bs-text);">New goal</div>
+						<div class="mt-0.5 text-xs" style="color: var(--bs-text-3);">Save for what matters</div>
+					</button>
+				</li>
+			</ul>
+		{/if}
+	</section>
+
+	<!-- Income categories -->
 	{#if income.length > 0}
 		<section class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" style="padding: 0;">
 			<div class="flex items-center justify-between" style="padding: 16px var(--bs-pad-card);">
@@ -338,23 +418,12 @@
 			<ul style="border-top: 0.5px solid var(--bs-border);">
 				{#each income as c (c.id)}
 					{@const received = incomeMap.get(c.id!) ?? 0}
-					<li
-						class="group flex items-center gap-3"
-						style="padding: 12px var(--bs-pad-card); border-bottom: 0.5px solid var(--bs-border);"
-					>
-						<div
-							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-							style="background: color-mix(in oklch, {c.color} 14%, var(--bs-surface)); color: {c.color}; border: 0.5px solid color-mix(in oklch, {c.color} 28%, transparent);"
-						>
+					<li class="group flex items-center gap-3" style="padding: 12px var(--bs-pad-card); border-bottom: 0.5px solid var(--bs-border);">
+						<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style="background: color-mix(in oklch, {c.color} 14%, var(--bs-surface)); color: {c.color}; border: 0.5px solid color-mix(in oklch, {c.color} 28%, transparent);">
 							<Icon name={c.icon} size={16} />
 						</div>
-						<span class="flex-1 truncate text-sm font-medium" style="color: var(--bs-text);">
-							{c.name}
-						</span>
-						<span
-							class="bs-mono shrink-0"
-							style="font-size: 13.5px; font-weight: 500; color: {received > 0 ? 'var(--bs-pos)' : 'var(--bs-text-3)'};"
-						>
+						<span class="flex-1 truncate text-sm font-medium" style="color: var(--bs-text);">{c.name}</span>
+						<span class="bs-mono shrink-0" style="font-size: 13.5px; font-weight: 500; color: {received > 0 ? 'var(--bs-pos)' : 'var(--bs-text-3)'};">
 							{money(received)}
 						</span>
 						<button
@@ -373,15 +442,10 @@
 
 	{#if archived.length}
 		<details>
-			<summary class="cursor-pointer text-sm" style="color: var(--bs-text-3);">
-				Archived ({archived.length})
-			</summary>
+			<summary class="cursor-pointer text-sm" style="color: var(--bs-text-3);">Archived ({archived.length})</summary>
 			<ul class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 				{#each archived as c (c.id)}
-					<li
-						class="flex items-center gap-3 rounded-lg bg-white p-3 dark:bg-slate-900"
-						style="border: 0.5px solid var(--bs-border);"
-					>
+					<li class="flex items-center gap-3 rounded-lg bg-white p-3 dark:bg-slate-900" style="border: 0.5px solid var(--bs-border);">
 						<span style="color: var(--bs-text-3);"><Icon name={c.icon} size={18} /></span>
 						<span class="flex-1 truncate" style="color: var(--bs-text-2);">{c.name}</span>
 						<Button size="sm" variant="secondary" onclick={() => unarchive(c)}>Restore</Button>
@@ -400,7 +464,9 @@
 	onclose={() => (showCategoryModal = false)}
 />
 
-<!-- Budget edit dialog — amount input + scope picker -->
+<GoalFormModal open={showGoalModal} editing={editingGoal} onclose={() => (showGoalModal = false)} />
+
+<!-- Budget edit dialog -->
 {#if pendingChange}
 	<div
 		class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm md:items-center md:p-4"
@@ -418,30 +484,11 @@
 			onkeydown={(e) => e.stopPropagation()}
 		>
 			<div style="padding: 20px var(--bs-pad-card);">
-				<h3 class="text-base font-semibold" style="color: var(--bs-text);">
-					{pendingChange.categoryName} budget
-				</h3>
-				<label
-					class="mt-3 mb-1 block"
-					style="font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bs-text-3);"
-				>
-					Monthly amount
-				</label>
+				<h3 class="text-base font-semibold" style="color: var(--bs-text);">{pendingChange.categoryName} budget</h3>
+				<label class="mt-3 mb-1 block" style="font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bs-text-3);">Monthly amount</label>
 				<div class="relative">
-					<span
-						class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm"
-						style="color: var(--bs-text-3);"
-					>$</span>
-					<input
-						type="number"
-						inputmode="decimal"
-						step="0.01"
-						min="0"
-						class="w-full pl-6 bs-mono"
-						bind:value={pendingChange.amount}
-						use:clearOnFocus
-						autofocus
-					/>
+					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm" style="color: var(--bs-text-3);">$</span>
+					<input type="number" inputmode="decimal" step="0.01" min="0" class="bs-mono w-full pl-6" bind:value={pendingChange.amount} use:clearOnFocus autofocus />
 				</div>
 				<p class="mt-3 text-xs" style="color: var(--bs-text-2);">Apply to:</p>
 			</div>
@@ -451,9 +498,7 @@
 					style="padding: 14px var(--bs-pad-card); border-bottom: 0.5px solid var(--bs-border);"
 					onclick={() => applyBudgetChange('month')}
 				>
-					<span class="font-medium" style="color: var(--bs-text);">
-						Just {monthLabel(month)}
-					</span>
+					<span class="font-medium" style="color: var(--bs-text);">Just {monthLabel(month)}</span>
 					<span class="text-xs" style="color: var(--bs-text-3);">This month only</span>
 				</button>
 				<button
@@ -461,9 +506,7 @@
 					style="padding: 14px var(--bs-pad-card); border-bottom: 0.5px solid var(--bs-border);"
 					onclick={() => applyBudgetChange('forward')}
 				>
-					<span class="font-medium" style="color: var(--bs-text);">
-						{monthLabel(month)} and following
-					</span>
+					<span class="font-medium" style="color: var(--bs-text);">{monthLabel(month)} and following</span>
 					<span class="text-xs" style="color: var(--bs-text-3);">Future months too</span>
 				</button>
 				<button

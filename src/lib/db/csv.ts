@@ -259,6 +259,7 @@ export async function importCSV(
 				type: inferAccountType(acctName),
 				openingBalance: 0,
 				currency: 'USD',
+				businessId: null,
 				archived: 0,
 				createdAt: Date.now()
 			} as Account);

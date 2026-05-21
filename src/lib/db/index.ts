@@ -104,6 +104,17 @@ export class BudgetDB extends Dexie {
 		this.version(6).stores({
 			goalContributions: '++id, goalId, date, createdAt'
 		});
+
+		// v7: accounts can be assigned to a business (Personal = null)
+		this.version(7)
+			.stores({
+				accounts: '++id, name, type, businessId, archived, createdAt'
+			})
+			.upgrade(async (tx) => {
+				await tx.table('accounts').toCollection().modify((a: Account) => {
+					if (a.businessId === undefined) a.businessId = null;
+				});
+			});
 	}
 }
 

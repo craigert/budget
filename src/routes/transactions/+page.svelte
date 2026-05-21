@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
 	import type { Account, Business, Category, Transaction } from '$lib/db/types';
-	import { money, formatDate, todayISO } from '$lib/utils/format';
+	import { money, formatDate, todayISO, thisMonth, monthLabel } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ReceiptLightbox from '$lib/components/ReceiptLightbox.svelte';
+	import BusinessFormModal from '$lib/components/BusinessFormModal.svelte';
+	import AddTransactionsToBusinessModal from '$lib/components/AddTransactionsToBusinessModal.svelte';
 	import { compressImage } from '$lib/utils/image';
 	import { scanReceiptWithAzure } from '$lib/utils/receiptOcr';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
@@ -17,7 +18,12 @@
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
 	const businesses = live<Business[]>(
-		() => db.businesses.where('archived').equals(0).toArray(),
+		() =>
+			db.businesses
+				.where('archived')
+				.equals(0)
+				.toArray()
+				.then((arr) => arr.sort((a, b) => a.sortOrder - b.sortOrder)),
 		[]
 	);
 	const txs = live<Transaction[]>(
@@ -27,8 +33,12 @@
 
 	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
 	const categoryMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
+	const businessMap = $derived(new Map(businesses.value.map((b) => [b.id!, b])));
 
-	// filters — `q` can be pre-seeded via ?q=… (e.g., from the global search overlay)
+	// Business filter: null = all transactions, 'all' = all business-tagged, number = specific business
+	let businessFilter = $state<null | 'all' | number>(null);
+
+	// Text / account / category / date filters
 	let q = $state(page.url.searchParams.get('q') ?? '');
 	$effect(() => {
 		const initial = page.url.searchParams.get('q');
@@ -41,7 +51,7 @@
 	let pageSize = $state(50);
 	let visibleCount = $state(50);
 
-	// ?highlight=<txId>: scroll into view + flash a highlight class
+	// ?highlight=<txId>: scroll into view + flash
 	let highlightId = $state<number | null>(null);
 	$effect(() => {
 		const raw = page.url.searchParams.get('highlight');
@@ -49,31 +59,36 @@
 		if (!id || Number.isNaN(id)) return;
 		highlightId = id;
 	});
-	// Whenever the highlight target appears in the rendered list, scroll + flash.
 	$effect(() => {
 		if (highlightId == null) return;
 		const inList = shown.some((t) => t.id === highlightId);
 		if (!inList) {
-			// Bump visibleCount until the row is shown, or give up if not in filtered set.
 			const idx = filtered.findIndex((t) => t.id === highlightId);
 			if (idx >= 0 && idx >= visibleCount) visibleCount = idx + 25;
 			return;
 		}
-		// Defer to next frame so the row has been laid out
 		requestAnimationFrame(() => {
 			const el = document.querySelector<HTMLElement>(`[data-tx-id="${highlightId}"]`);
 			if (!el) return;
 			el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 			el.classList.add('tx-flash');
 			setTimeout(() => el.classList.remove('tx-flash'), 2400);
-			// Clear so we don't re-fire on later effects
 			highlightId = null;
 		});
+	});
+
+	// Scoped set (business filter only) — used for KPI tiles
+	const scoped = $derived.by(() => {
+		if (businessFilter === null) return txs.value;
+		if (businessFilter === 'all') return txs.value.filter((t) => t.businessId != null);
+		return txs.value.filter((t) => t.businessId === businessFilter);
 	});
 
 	const filtered = $derived.by(() => {
 		const qq = q.trim().toLowerCase();
 		return txs.value.filter((t) => {
+			if (businessFilter === 'all' && t.businessId == null) return false;
+			if (typeof businessFilter === 'number' && t.businessId !== businessFilter) return false;
 			if (accountFilter !== '' && t.accountId !== accountFilter) return false;
 			if (categoryFilter !== '' && t.categoryId !== categoryFilter) return false;
 			if (fromDate && t.date < fromDate) return false;
@@ -98,7 +113,120 @@
 		visibleCount = pageSize;
 	}
 
-	// edit form
+	// KPI tiles (shown when a business filter is active)
+	const now = thisMonth();
+	const monthStart = `${now}-01`;
+	const monthEnd = `${now}-32`;
+	const ytdStart = $derived(`${now.slice(0, 4)}-01-01`);
+	const ytdEnd = $derived(`${now.slice(0, 4)}-12-31`);
+
+	const monthIncome = $derived(
+		scoped.filter((t) => t.amount > 0 && t.date >= monthStart && t.date <= monthEnd)
+			.reduce((s, t) => s + t.amount, 0)
+	);
+	const monthExpense = $derived(
+		scoped.filter((t) => t.amount < 0 && t.date >= monthStart && t.date <= monthEnd)
+			.reduce((s, t) => s + -t.amount, 0)
+	);
+	const ytdIncome = $derived(
+		scoped.filter((t) => t.amount > 0 && t.date >= ytdStart && t.date <= ytdEnd)
+			.reduce((s, t) => s + t.amount, 0)
+	);
+	const ytdExpense = $derived(
+		scoped.filter((t) => t.amount < 0 && t.date >= ytdStart && t.date <= ytdEnd)
+			.reduce((s, t) => s + -t.amount, 0)
+	);
+
+	// Per-business counts for pill badges
+	const bizTotals = $derived.by(() => {
+		const map = new Map<number, { count: number }>();
+		for (const t of txs.value) {
+			if (t.businessId == null) continue;
+			const entry = map.get(t.businessId) ?? { count: 0 };
+			entry.count++;
+			map.set(t.businessId, entry);
+		}
+		return map;
+	});
+
+	const businessTaggedCount = $derived(txs.value.filter((t) => t.businessId != null).length);
+	const selectedBiz = $derived(
+		typeof businessFilter === 'number' ? (businessMap.get(businessFilter) ?? null) : null
+	);
+
+	// Business management
+	let showBizModal = $state(false);
+	let editingBiz = $state<Business | null>(null);
+	let showAddTxModal = $state(false);
+
+	function openAddBusiness() {
+		editingBiz = null;
+		showBizModal = true;
+	}
+	function openEditBusiness(b: Business) {
+		editingBiz = b;
+		showBizModal = true;
+	}
+	async function archiveBusiness(b: Business) {
+		if (!b.id) return;
+		const count = await db.transactions
+			.toArray()
+			.then((all) => all.filter((t) => t.businessId === b.id).length);
+		const msg = count
+			? `Archive "${b.name}"? ${count} transaction(s) will become unassigned.`
+			: `Archive "${b.name}"?`;
+		if (!confirm(msg)) return;
+		await db.transaction('rw', [db.businesses, db.transactions], async () => {
+			if (count) {
+				await db.transactions.toCollection().modify((t) => {
+					if (t.businessId === b.id) t.businessId = null;
+				});
+			}
+			await db.businesses.update(b.id!, { archived: 1 });
+		});
+		if (businessFilter === b.id) businessFilter = null;
+	}
+
+	async function reassignTransaction(t: Transaction, bizId: number | null) {
+		if (!t.id) return;
+		await db.transactions.update(t.id, { businessId: bizId });
+	}
+
+	function exportCSV() {
+		const headers = ['Date', 'Account', 'Business', 'Category', 'Payee', 'Expense', 'Income', 'Notes'];
+		const escape = (s: unknown) => {
+			const str = s == null ? '' : String(s);
+			return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+		};
+		const lines = [headers.join(',')];
+		for (const t of filtered) {
+			const acct = accountMap.get(t.accountId)?.name ?? '';
+			const cat = t.categoryId != null ? categoryMap.get(t.categoryId)?.name ?? '' : '';
+			const biz = t.businessId != null ? businessMap.get(t.businessId)?.name ?? '' : '';
+			const expense = t.amount < 0 ? (-t.amount).toFixed(2) : '';
+			const income = t.amount > 0 ? t.amount.toFixed(2) : '';
+			lines.push(
+				[t.date, escape(acct), escape(biz), escape(cat), escape(t.payee), expense, income, escape(t.notes)].join(',')
+			);
+		}
+		const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		const tag =
+			businessFilter === 'all'
+				? 'all-businesses'
+				: selectedBiz
+					? selectedBiz.name.toLowerCase().replace(/\s+/g, '-')
+					: 'transactions';
+		a.download = `${tag}-${now}.csv`;
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		URL.revokeObjectURL(url);
+	}
+
+	// Transaction edit form
 	let showModal = $state(false);
 	let editing = $state<Transaction | null>(null);
 	let form = $state({
@@ -114,14 +242,13 @@
 		receiptBlob: null as Blob | null
 	});
 
-	// Receipt capture state
+	// Receipt capture
 	let receiptInput: HTMLInputElement | undefined = $state();
 	let receiptObjectUrl = $state<string | null>(null);
 	let receiptBusy = $state(false);
 	let receiptScanStatus = $state<{ ok: boolean; message: string } | null>(null);
 
 	$effect(() => {
-		// Whenever the form's blob changes, refresh the preview URL
 		const blob = form.receiptBlob;
 		if (!blob) {
 			if (receiptObjectUrl) URL.revokeObjectURL(receiptObjectUrl);
@@ -136,7 +263,7 @@
 	async function onPickReceipt(e: Event) {
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
-		input.value = ''; // allow picking the same file again later
+		input.value = '';
 		if (!file) return;
 		receiptBusy = true;
 		receiptScanStatus = null;
@@ -146,10 +273,6 @@
 				return file;
 			});
 			form.receiptBlob = compressed;
-
-			// Always try the OCR proxy. It returns 503 if the deployment hasn't
-			// been configured with Azure credentials — we treat that as "OCR
-			// unavailable, fill in manually."
 			receiptScanStatus = { ok: true, message: 'Scanning receipt…' };
 			try {
 				const result = await scanReceiptWithAzure(compressed);
@@ -171,8 +294,6 @@
 					: { ok: true, message: 'Receipt scanned, but no fields could be extracted. Fill in manually.' };
 			} catch (err) {
 				const message = (err as Error).message;
-				// If OCR isn't configured at all, stay quiet — the user still has
-				// their image attached and can type the details in.
 				if (/not configured/i.test(message)) {
 					receiptScanStatus = null;
 				} else {
@@ -200,7 +321,7 @@
 			payee: '',
 			notes: '',
 			cleared: true,
-			businessId: null,
+			businessId: typeof businessFilter === 'number' ? businessFilter : null,
 			receiptBlob: null
 		};
 		receiptScanStatus = null;
@@ -248,10 +369,6 @@
 		showModal = false;
 	}
 
-	// Lightbox state for viewing receipts from the list
-	let lightboxBlob = $state<Blob | null>(null);
-	let lightboxTitle = $state('');
-
 	async function remove(t: Transaction) {
 		if (!t.id) return;
 		if (!confirm(`Delete "${t.payee || 'transaction'}"?`)) return;
@@ -268,15 +385,94 @@
 		const cat = categoryMap.get(form.categoryId);
 		if (cat) form.isExpense = cat.kind === 'expense';
 	});
+
+	// Lightbox
+	let lightboxBlob = $state<Blob | null>(null);
+	let lightboxTitle = $state('');
 </script>
 
 <PageHeader title="Transactions" subtitle={`${filtered.length} shown · net ${money(totalShown)}`}>
 	{#snippet actions()}
+		{#if businesses.value.length > 0 && businessFilter !== null && filtered.length > 0}
+			<Button variant="secondary" size="sm" onclick={exportCSV}>Export CSV</Button>
+		{/if}
+		{#if businesses.value.length > 0}
+			<Button variant="secondary" size="sm" onclick={() => (showAddTxModal = true)}>+ Add to business</Button>
+		{/if}
+		<Button variant="secondary" size="sm" onclick={openAddBusiness}>+ New business</Button>
 		<Button variant="onbrand" onclick={openCreate} disabled={accounts.value.length === 0}>+ Transaction</Button>
 	{/snippet}
 </PageHeader>
 
 <div class="space-y-4 p-4 md:p-8">
+
+	<!-- Business filter pills (only when businesses exist) -->
+	{#if businesses.value.length > 0}
+		<div class="flex flex-wrap items-center gap-2">
+			<button
+				class="flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors {businessFilter === null
+					? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-100'
+					: 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'}"
+				onclick={() => (businessFilter = null)}
+			>
+				All transactions
+			</button>
+			<button
+				class="flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors {businessFilter === 'all'
+					? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-100'
+					: 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'}"
+				onclick={() => (businessFilter = 'all')}
+			>
+				<span>All businesses</span>
+				<span class="rounded-full bg-slate-200 px-1.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">{businessTaggedCount}</span>
+			</button>
+			{#each businesses.value as b (b.id)}
+				<button
+					class="flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors {businessFilter === b.id
+						? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-100'
+						: 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'}"
+					onclick={() => (businessFilter = b.id!)}
+				>
+					<span style="color:{b.color}"><Icon name={b.icon} size={14} /></span>
+					<span>{b.name}</span>
+					<span class="rounded-full bg-slate-200 px-1.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">{bizTotals.get(b.id!)?.count ?? 0}</span>
+				</button>
+			{/each}
+			{#if selectedBiz}
+				<button
+					class="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+					onclick={() => openEditBusiness(selectedBiz!)}
+				>Edit</button>
+				<button
+					class="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
+					onclick={() => archiveBusiness(selectedBiz!)}
+				>Archive</button>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- KPI tiles (shown when a business filter is active) -->
+	{#if businessFilter !== null}
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+				<div class="section-label">Income · {monthLabel(now)}</div>
+				<div class="mt-1 text-2xl font-semibold tabular-nums text-brand-500">{money(monthIncome)}</div>
+			</div>
+			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+				<div class="section-label">Expenses · {monthLabel(now)}</div>
+				<div class="mt-1 text-2xl font-semibold tabular-nums">{money(monthExpense)}</div>
+			</div>
+			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+				<div class="section-label">Income · YTD</div>
+				<div class="mt-1 text-2xl font-semibold tabular-nums text-brand-500">{money(ytdIncome)}</div>
+			</div>
+			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+				<div class="section-label">Net · YTD</div>
+				<div class="mt-1 text-2xl font-semibold tabular-nums {ytdIncome - ytdExpense < 0 ? 'text-red-600' : ''}">{money(ytdIncome - ytdExpense)}</div>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Filter bar -->
 	<div class="grid gap-2 md:grid-cols-6">
 		<input type="search" bind:value={q} placeholder="Search payee or notes" class="md:col-span-2" />
@@ -305,13 +501,22 @@
 		</div>
 	{:else if filtered.length === 0}
 		<div class="rounded-lg border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700">
-			No transactions match.
+			{#if businessFilter !== null && scoped.length === 0}
+				{#if selectedBiz}
+					No transactions tagged to <strong>{selectedBiz.name}</strong> yet. Edit a transaction and assign it to this business.
+				{:else}
+					No business-tagged transactions yet.
+				{/if}
+			{:else}
+				No transactions match.
+			{/if}
 		</div>
 	{:else}
 		<ul class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
 			{#each shown as t (t.id)}
 				{@const cat = t.categoryId != null ? categoryMap.get(t.categoryId) : null}
 				{@const acct = accountMap.get(t.accountId)}
+				{@const biz = t.businessId != null ? businessMap.get(t.businessId) : null}
 				<li data-tx-id={t.id} class="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
 					<div
 						class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
@@ -322,15 +527,11 @@
 					<div class="min-w-0 flex-1">
 						<div class="flex items-baseline justify-between gap-2">
 							<div class="truncate font-medium">{t.payee || '(no payee)'}</div>
-							<div
-								class="shrink-0 font-semibold tabular-nums {t.amount < 0
-									? 'text-slate-900 dark:text-slate-100'
-									: 'text-emerald-600 dark:text-emerald-400'}"
-							>
+							<div class="shrink-0 font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
 								{money(t.amount)}
 							</div>
 						</div>
-						<div class="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+						<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
 							<span>{formatDate(t.date)}</span>
 							<span aria-hidden>·</span>
 							<span class="truncate">{cat?.name ?? 'Uncategorized'}</span>
@@ -339,12 +540,34 @@
 							{#if t.cleared === 0}
 								<span class="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">pending</span>
 							{/if}
+							{#if biz}
+								<span class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style="background:{biz.color}22;color:{biz.color}">
+									<Icon name={biz.icon} size={10} />
+									{biz.name}
+								</span>
+							{/if}
 						</div>
 						{#if t.notes}
 							<div class="mt-0.5 truncate text-xs text-slate-500">{t.notes}</div>
 						{/if}
 					</div>
 					<div class="flex shrink-0 items-center gap-1">
+						{#if businesses.value.length > 0}
+							<select
+								class="shrink-0 text-xs"
+								value={t.businessId ?? ''}
+								onchange={(e) => {
+									const v = (e.currentTarget as HTMLSelectElement).value;
+									reassignTransaction(t, v === '' ? null : Number(v));
+								}}
+								aria-label="Assign business"
+							>
+								<option value="">Personal</option>
+								{#each businesses.value as b (b.id)}
+									<option value={b.id}>{b.name}</option>
+								{/each}
+							</select>
+						{/if}
 						{#if t.receiptBlob}
 							<button
 								class="rounded-md p-1.5 text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -391,22 +614,14 @@
 		<div class="flex rounded-md border border-slate-300 dark:border-slate-700">
 			<button
 				type="button"
-				class="flex-1 rounded-l-md py-2 text-sm font-medium {form.isExpense
-					? 'bg-red-500 text-white'
-					: 'bg-transparent text-slate-700 dark:text-slate-300'}"
+				class="flex-1 rounded-l-md py-2 text-sm font-medium {form.isExpense ? 'bg-red-500 text-white' : 'bg-transparent text-slate-700 dark:text-slate-300'}"
 				onclick={() => (form.isExpense = true)}
-			>
-				Expense
-			</button>
+			>Expense</button>
 			<button
 				type="button"
-				class="flex-1 rounded-r-md py-2 text-sm font-medium {!form.isExpense
-					? 'bg-emerald-500 text-white'
-					: 'bg-transparent text-slate-700 dark:text-slate-300'}"
+				class="flex-1 rounded-r-md py-2 text-sm font-medium {!form.isExpense ? 'bg-emerald-500 text-white' : 'bg-transparent text-slate-700 dark:text-slate-300'}"
 				onclick={() => (form.isExpense = false)}
-			>
-				Income
-			</button>
+			>Income</button>
 		</div>
 
 		<div class="grid grid-cols-2 gap-3">
@@ -418,17 +633,7 @@
 				<label for="tx-amount" class="mb-1 block text-sm font-medium">Amount</label>
 				<div class="relative">
 					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
-					<input
-						id="tx-amount"
-						type="number"
-						inputmode="decimal"
-						step="0.01"
-						min="0"
-						bind:value={form.amount}
-						use:clearOnFocus
-						class="w-full pl-6"
-						required
-					/>
+					<input id="tx-amount" type="number" inputmode="decimal" step="0.01" min="0" bind:value={form.amount} use:clearOnFocus class="w-full pl-6" required />
 				</div>
 			</div>
 		</div>
@@ -467,29 +672,26 @@
 			Cleared (transaction has posted)
 		</label>
 
-		<div>
-			<label for="tx-biz" class="mb-1 block text-sm font-medium">Business</label>
-			<select id="tx-biz" bind:value={form.businessId} class="w-full">
-				<option value={null}>— None —</option>
-				{#each businesses.value as b (b.id)}
-					<option value={b.id}>{b.name}</option>
-				{/each}
-			</select>
-		</div>
+		{#if businesses.value.length > 0}
+			<div>
+				<label for="tx-biz" class="mb-1 block text-sm font-medium">Business</label>
+				<select id="tx-biz" bind:value={form.businessId} class="w-full">
+					<option value={null}>— Personal —</option>
+					{#each businesses.value as b (b.id)}
+						<option value={b.id}>{b.name}</option>
+					{/each}
+				</select>
+			</div>
+		{/if}
 
-		<!-- Receipt photo: mobile-only (camera capture isn't useful on desktop) -->
+		<!-- Receipt photo: mobile-only -->
 		<div class="md:hidden">
 			<div class="mb-1 block text-sm font-medium">Receipt</div>
 			{#if form.receiptBlob && receiptObjectUrl}
 				<div class="flex items-start gap-3">
 					<button
 						type="button"
-						onclick={() => {
-							if (form.receiptBlob) {
-								lightboxBlob = form.receiptBlob;
-								lightboxTitle = form.payee || 'Receipt';
-							}
-						}}
+						onclick={() => { if (form.receiptBlob) { lightboxBlob = form.receiptBlob; lightboxTitle = form.payee || 'Receipt'; } }}
 						class="block h-24 w-24 shrink-0 overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
 						aria-label="View receipt"
 					>
@@ -511,20 +713,9 @@
 					{receiptBusy ? 'Processing…' : 'Take or upload receipt'}
 				</button>
 			{/if}
-			<input
-				bind:this={receiptInput}
-				type="file"
-				accept="image/*"
-				capture="environment"
-				class="hidden"
-				onchange={onPickReceipt}
-			/>
+			<input bind:this={receiptInput} type="file" accept="image/*" capture="environment" class="hidden" onchange={onPickReceipt} />
 			{#if receiptScanStatus}
-				<p
-					class="mt-2 rounded-md border px-3 py-2 text-xs {receiptScanStatus.ok
-						? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
-						: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200'}"
-				>
+				<p class="mt-2 rounded-md border px-3 py-2 text-xs {receiptScanStatus.ok ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200' : 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200'}">
 					{receiptScanStatus.message}
 				</p>
 			{/if}
@@ -535,5 +726,15 @@
 		<Button type="submit" onclick={save}>{editing ? 'Save' : 'Create'}</Button>
 	{/snippet}
 </Modal>
+
+<BusinessFormModal open={showBizModal} editing={editingBiz} onclose={() => (showBizModal = false)} />
+
+<AddTransactionsToBusinessModal
+	open={showAddTxModal}
+	businesses={businesses.value}
+	defaultBusinessId={typeof businessFilter === 'number' ? businessFilter : null}
+	onclose={() => (showAddTxModal = false)}
+	ontagged={(_count, bizId) => { businessFilter = bizId; }}
+/>
 
 <ReceiptLightbox blob={lightboxBlob} title={lightboxTitle} onclose={() => (lightboxBlob = null)} />
