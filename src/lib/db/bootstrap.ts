@@ -55,31 +55,42 @@ async function tryFetchDefaultSpreadsheet(): Promise<string | null> {
 	);
 }
 
+async function attemptDemoImport(): Promise<boolean> {
+	const csvText = await tryFetchDefaultSpreadsheet();
+	if (!csvText) return false;
+	try {
+		await importCSV(csvText, 'append');
+		return true;
+	} catch (e) {
+		console.warn('Demo auto-import failed:', e);
+		return false;
+	}
+}
+
 /**
  * Runs on every app load. Idempotent.
- * - If already seeded, no-op.
- * - On a fresh DB: seed default categories, then try to auto-import
- *   /budget-demo.csv (or .xlsx). On miss, you still have default categories.
+ *
+ * - Fresh DB: seed default categories, then import default-budget.xlsx so
+ *   the app opens with a realistic year of sample data.
+ * - Already-seeded DB: backfill any newly-shipped default categories.
+ *   If transactions are empty (user wiped data, or the original demo import
+ *   silently failed), re-attempt the demo import. Skipping the import when
+ *   transactions already exist prevents duplication for users with real data.
  */
 export async function bootstrap() {
 	const before = await db.settings.get('seeded');
+
 	if (before?.value) {
-		// Already seeded — still backfill any new default categories that
-		// have shipped since the user first set up the app.
 		await ensureDefaultCategories();
+		const txCount = await db.transactions.count();
+		if (txCount === 0) {
+			const ok = await attemptDemoImport();
+			return { autoImported: ok, freshSeed: false };
+		}
 		return { autoImported: false, freshSeed: false };
 	}
 
 	await seedIfEmpty();
-
-	const csvText = await tryFetchDefaultSpreadsheet();
-	if (csvText) {
-		try {
-			await importCSV(csvText, 'append');
-			return { autoImported: true, freshSeed: true };
-		} catch (e) {
-			console.warn('Demo auto-import failed:', e);
-		}
-	}
-	return { autoImported: false, freshSeed: true };
+	const ok = await attemptDemoImport();
+	return { autoImported: ok, freshSeed: true };
 }
