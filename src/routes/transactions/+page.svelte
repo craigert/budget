@@ -11,6 +11,8 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import ReceiptLightbox from '$lib/components/ReceiptLightbox.svelte';
 	import { compressImage } from '$lib/utils/image';
+	import { scanReceiptWithAzure } from '$lib/utils/receiptOcr';
+	import { getAzureConfig } from '$lib/db/azure';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
@@ -117,6 +119,7 @@
 	let receiptInput: HTMLInputElement | undefined = $state();
 	let receiptObjectUrl = $state<string | null>(null);
 	let receiptBusy = $state(false);
+	let receiptScanStatus = $state<{ ok: boolean; message: string } | null>(null);
 
 	$effect(() => {
 		// Whenever the form's blob changes, refresh the preview URL
@@ -137,11 +140,40 @@
 		input.value = ''; // allow picking the same file again later
 		if (!file) return;
 		receiptBusy = true;
+		receiptScanStatus = null;
 		try {
-			form.receiptBlob = await compressImage(file);
-		} catch (err) {
-			console.warn('Receipt compress failed, using raw file', err);
-			form.receiptBlob = file;
+			const compressed = await compressImage(file).catch((err) => {
+				console.warn('Receipt compress failed, using raw file', err);
+				return file;
+			});
+			form.receiptBlob = compressed;
+
+			// If Azure is configured, scan the receipt and pre-fill the form.
+			const cfg = await getAzureConfig();
+			if (cfg) {
+				receiptScanStatus = { ok: true, message: 'Scanning receipt…' };
+				try {
+					const result = await scanReceiptWithAzure(compressed);
+					const parts: string[] = [];
+					if (result.merchant && !form.payee.trim()) {
+						form.payee = result.merchant;
+						parts.push(`payee → ${result.merchant}`);
+					}
+					if (typeof result.total === 'number' && result.total > 0 && form.amount === 0) {
+						form.amount = result.total;
+						parts.push(`amount → $${result.total.toFixed(2)}`);
+					}
+					if (result.date && /^\d{4}-\d{2}-\d{2}$/.test(result.date)) {
+						form.date = result.date;
+						parts.push(`date → ${result.date}`);
+					}
+					receiptScanStatus = parts.length
+						? { ok: true, message: `Filled ${parts.join(', ')}. Confirm before saving.` }
+						: { ok: true, message: 'Receipt scanned, but no fields could be extracted. Fill in manually.' };
+				} catch (err) {
+					receiptScanStatus = { ok: false, message: `OCR failed: ${(err as Error).message}` };
+				}
+			}
 		} finally {
 			receiptBusy = false;
 		}
@@ -149,6 +181,7 @@
 
 	function removeReceipt() {
 		form.receiptBlob = null;
+		receiptScanStatus = null;
 	}
 
 	function openCreate() {
@@ -165,6 +198,7 @@
 			businessId: null,
 			receiptBlob: null
 		};
+		receiptScanStatus = null;
 		showModal = true;
 	}
 
@@ -182,6 +216,7 @@
 			businessId: t.businessId ?? null,
 			receiptBlob: t.receiptBlob ?? null
 		};
+		receiptScanStatus = null;
 		showModal = true;
 	}
 
@@ -479,6 +514,15 @@
 				class="hidden"
 				onchange={onPickReceipt}
 			/>
+			{#if receiptScanStatus}
+				<p
+					class="mt-2 rounded-md border px-3 py-2 text-xs {receiptScanStatus.ok
+						? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
+						: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200'}"
+				>
+					{receiptScanStatus.message}
+				</p>
+			{/if}
 		</div>
 	</form>
 	{#snippet footer()}

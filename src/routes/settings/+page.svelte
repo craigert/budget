@@ -6,6 +6,14 @@
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
 	import { seedIfEmpty } from '$lib/db/seed';
+	import {
+		AZURE_DEFAULTS,
+		clearAzureConfig,
+		getAzureConfig,
+		saveAzureConfig,
+		testAzureConfig,
+		type AzureDocIntelConfig
+	} from '$lib/db/azure';
 	import type { Account, Category, Transaction, Budget } from '$lib/db/types';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -19,6 +27,68 @@
 	let csvInput: HTMLInputElement;
 	let status = $state('');
 	let busy = $state(false);
+
+	// === Azure Document Intelligence (receipt OCR) ===
+	let azureForm = $state<AzureDocIntelConfig>({
+		endpoint: '',
+		key: '',
+		model: AZURE_DEFAULTS.model,
+		apiVersion: AZURE_DEFAULTS.apiVersion
+	});
+	let azureShowKey = $state(false);
+	let azureBusy = $state(false);
+	let azureStatus = $state<{ ok: boolean; message: string } | null>(null);
+	let azureConfigured = $state(false);
+
+	$effect(() => {
+		(async () => {
+			const cfg = await getAzureConfig();
+			if (cfg) {
+				azureForm = cfg;
+				azureConfigured = true;
+			}
+		})();
+	});
+
+	async function saveAzure() {
+		azureStatus = null;
+		if (!azureForm.endpoint.trim() || !azureForm.key.trim()) {
+			azureStatus = { ok: false, message: 'Endpoint and key are both required.' };
+			return;
+		}
+		azureBusy = true;
+		try {
+			await saveAzureConfig(azureForm);
+			azureConfigured = true;
+			azureStatus = { ok: true, message: 'Saved. Receipts will now be sent to Azure for OCR.' };
+		} catch (err) {
+			azureStatus = { ok: false, message: `Save failed: ${(err as Error).message}` };
+		} finally {
+			azureBusy = false;
+		}
+	}
+
+	async function testAzure() {
+		azureStatus = null;
+		if (!azureForm.endpoint.trim() || !azureForm.key.trim()) {
+			azureStatus = { ok: false, message: 'Endpoint and key are both required.' };
+			return;
+		}
+		azureBusy = true;
+		try {
+			azureStatus = await testAzureConfig(azureForm);
+		} finally {
+			azureBusy = false;
+		}
+	}
+
+	async function clearAzure() {
+		if (!confirm('Remove the saved Azure configuration?')) return;
+		await clearAzureConfig();
+		azureForm = { endpoint: '', key: '', model: AZURE_DEFAULTS.model, apiVersion: AZURE_DEFAULTS.apiVersion };
+		azureConfigured = false;
+		azureStatus = { ok: true, message: 'Cleared. Receipts will no longer be sent to Azure.' };
+	}
 
 	async function handleFile(e: Event) {
 		const f = (e.target as HTMLInputElement).files?.[0];
@@ -162,6 +232,107 @@
 		{#if status}
 			<p class="mt-3 text-sm text-slate-600 dark:text-slate-400">{status}</p>
 		{/if}
+	</section>
+
+	<!-- Azure Document Intelligence (receipt OCR) -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-4 flex items-start justify-between gap-3">
+			<div>
+				<h2 class="text-lg font-semibold">Receipt OCR · Azure Document Intelligence</h2>
+				<p class="mt-1 text-sm text-slate-500">
+					When configured, captured receipts are sent to Azure's prebuilt-receipt model and the merchant / total / date are auto-filled.
+				</p>
+			</div>
+			{#if azureConfigured}
+				<span class="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-500/20 dark:text-brand-100">Active</span>
+			{/if}
+		</div>
+
+		<!-- Dev / demo warning -->
+		<div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-700/50 dark:bg-amber-900/20">
+			<div class="mb-1 font-semibold text-amber-800 dark:text-amber-200">⚠ Dev / demo configuration — not production-safe</div>
+			<ul class="list-inside list-disc space-y-0.5 text-amber-800/90 dark:text-amber-200/85">
+				<li>The key is stored in this browser's IndexedDB and is visible to anyone with DevTools access.</li>
+				<li>Every receipt scan sends the key from the browser to Azure — visible in the Network tab.</li>
+				<li>Azure CORS must allow this app's origin, or the request will fail. Typically requires a proxy (Cloudflare Worker, Azure Function, APIM).</li>
+				<li>For multi-user / production, move this to a server-side proxy that holds the key as a secret.</li>
+			</ul>
+		</div>
+
+		<div class="space-y-3">
+			<div>
+				<label for="az-endpoint" class="mb-1 block text-sm font-medium">Endpoint</label>
+				<input
+					id="az-endpoint"
+					type="url"
+					bind:value={azureForm.endpoint}
+					placeholder="https://YOUR-RESOURCE.cognitiveservices.azure.com"
+					class="w-full font-mono text-xs"
+					autocomplete="off"
+					spellcheck="false"
+				/>
+				<p class="mt-1 text-[11px] text-slate-500">Base URL of your Document Intelligence resource (no trailing path).</p>
+			</div>
+
+			<div>
+				<label for="az-key" class="mb-1 block text-sm font-medium">Subscription key</label>
+				<div class="flex gap-2">
+					<input
+						id="az-key"
+						type={azureShowKey ? 'text' : 'password'}
+						bind:value={azureForm.key}
+						placeholder="32-character key from Azure Keys & Endpoint"
+						class="w-full font-mono text-xs"
+						autocomplete="off"
+						spellcheck="false"
+					/>
+					<Button size="sm" variant="secondary" onclick={() => (azureShowKey = !azureShowKey)}>
+						{azureShowKey ? 'Hide' : 'Show'}
+					</Button>
+				</div>
+			</div>
+
+			<div class="grid gap-3 sm:grid-cols-2">
+				<div>
+					<label for="az-model" class="mb-1 block text-sm font-medium">Model</label>
+					<input
+						id="az-model"
+						type="text"
+						bind:value={azureForm.model}
+						placeholder={AZURE_DEFAULTS.model}
+						class="w-full font-mono text-xs"
+					/>
+				</div>
+				<div>
+					<label for="az-api" class="mb-1 block text-sm font-medium">API version</label>
+					<input
+						id="az-api"
+						type="text"
+						bind:value={azureForm.apiVersion}
+						placeholder={AZURE_DEFAULTS.apiVersion}
+						class="w-full font-mono text-xs"
+					/>
+				</div>
+			</div>
+
+			<div class="flex flex-wrap gap-2">
+				<Button onclick={saveAzure} disabled={azureBusy}>{azureBusy ? 'Working…' : 'Save'}</Button>
+				<Button variant="secondary" onclick={testAzure} disabled={azureBusy}>Test connection</Button>
+				{#if azureConfigured}
+					<Button variant="ghost" onclick={clearAzure} disabled={azureBusy}>Remove configuration</Button>
+				{/if}
+			</div>
+
+			{#if azureStatus}
+				<p
+					class="rounded-md border px-3 py-2 text-sm {azureStatus.ok
+						? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
+						: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200'}"
+				>
+					{azureStatus.message}
+				</p>
+			{/if}
+		</div>
 	</section>
 
 	<section class="rounded-xl border border-red-200 bg-red-50 p-5 dark:border-red-900/40 dark:bg-red-950/30">
