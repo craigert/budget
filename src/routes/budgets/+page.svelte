@@ -149,6 +149,7 @@
 		if (budgeted === 0) return { label: '', tone: 'idle' as const };
 		if (spent > budgeted) return { label: 'Over budget', tone: 'neg' as const };
 		const pct = (spent / budgeted) * 100;
+		if (pct >= 100) return { label: 'Reached', tone: 'warn' as const };
 		if (pct >= 80) return { label: 'Close to limit', tone: 'warn' as const };
 		return { label: `${daysLeftInMonth} days left`, tone: 'idle' as const };
 	}
