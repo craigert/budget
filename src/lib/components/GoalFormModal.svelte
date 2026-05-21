@@ -155,7 +155,10 @@
 		<div class="grid grid-cols-2 gap-3">
 			<div>
 				<label for="g-target" class="mb-1 block text-sm font-medium">Target amount</label>
-				<input id="g-target" type="number" step="100" min="0" bind:value={form.targetAmount} use:clearOnFocus class="w-full" required />
+				<div class="relative">
+					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+					<input id="g-target" type="number" step="100" min="0" bind:value={form.targetAmount} use:clearOnFocus class="w-full pl-6" required />
+				</div>
 			</div>
 			<div>
 				<label for="g-deadline" class="mb-1 block text-sm font-medium">Deadline (optional)</label>
@@ -239,7 +242,10 @@
 			</div>
 			<div>
 				<label for="g-baseline" class="mb-1 block text-sm font-medium">Baseline (offset)</label>
-				<input id="g-baseline" type="number" step="0.01" bind:value={form.baselineAmount} use:clearOnFocus class="w-full" />
+				<div class="relative">
+					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+					<input id="g-baseline" type="number" step="0.01" bind:value={form.baselineAmount} use:clearOnFocus class="w-full pl-6" />
+				</div>
 				<p class="mt-0.5 text-[10px] text-slate-500">Subtracted from progress so an account that already has money doesn't show as 100% complete.</p>
 			</div>
 		</div>

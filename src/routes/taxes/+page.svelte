@@ -525,18 +525,21 @@
 		<div class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
 			<div>
 				<label for="agi" class="mb-1 block text-xs font-medium">Your {year} Adjusted Gross Income (AGI)</label>
-				<input
-					id="agi"
-					type="number"
-					inputmode="decimal"
-					step="100"
-					min="0"
-					bind:value={agiInput}
-					use:clearOnFocus
-					onblur={saveAGI}
-					placeholder="Enter AGI to compute the deductible portion"
-					class="w-full"
-				/>
+				<div class="relative">
+					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+					<input
+						id="agi"
+						type="number"
+						inputmode="decimal"
+						step="100"
+						min="0"
+						bind:value={agiInput}
+						use:clearOnFocus
+						onblur={saveAGI}
+						placeholder="Enter AGI to compute the deductible portion"
+						class="w-full pl-6"
+					/>
+				</div>
 			</div>
 			<div class="text-xs text-slate-500">
 				{#if agi > 0}

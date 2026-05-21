@@ -288,16 +288,19 @@
 			</div>
 			<div>
 				<label for="tx-amount" class="mb-1 block text-sm font-medium">Amount</label>
-				<input
-					id="tx-amount"
-					type="number"
-					step="0.01"
-					min="0"
-					bind:value={form.amount}
-					use:clearOnFocus
-					class="w-full"
-					required
-				/>
+				<div class="relative">
+					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+					<input
+						id="tx-amount"
+						type="number"
+						step="0.01"
+						min="0"
+						bind:value={form.amount}
+						use:clearOnFocus
+						class="w-full pl-6"
+						required
+					/>
+				</div>
 			</div>
 		</div>
 

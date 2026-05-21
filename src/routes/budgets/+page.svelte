@@ -163,16 +163,19 @@
 								<Icon name={c.icon} size={20} />
 							</div>
 							<div class="flex-1 truncate font-medium">{c.name}</div>
-							<input
-								type="number"
-								step="0.01"
-								min="0"
-								class="w-28 text-right tabular-nums"
-								value={budgeted}
-								use:clearOnFocus
-								onchange={(e) => setAmount(c.id!, Number((e.currentTarget as HTMLInputElement).value))}
-								aria-label="Monthly budget for {c.name}"
-							/>
+							<div class="relative w-28 shrink-0">
+								<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+								<input
+									type="number"
+									step="0.01"
+									min="0"
+									class="w-full pl-6 text-right tabular-nums"
+									value={budgeted}
+									use:clearOnFocus
+									onchange={(e) => setAmount(c.id!, Number((e.currentTarget as HTMLInputElement).value))}
+									aria-label="Monthly budget for {c.name}"
+								/>
+							</div>
 							<div class="flex shrink-0 gap-1 opacity-60 transition-opacity group-hover:opacity-100">
 								<button
 									class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
