@@ -331,9 +331,9 @@
 		>
 			<defs>
 				<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-					<stop offset="0%" stop-color="currentColor" stop-opacity="0.28" class="text-brand-500" />
-					<stop offset="60%" stop-color="currentColor" stop-opacity="0.06" class="text-brand-500" />
-					<stop offset="100%" stop-color="currentColor" stop-opacity="0" class="text-brand-500" />
+					<stop offset="0%" stop-color="currentColor" stop-opacity="0.28" class="text-brand-600" />
+					<stop offset="60%" stop-color="currentColor" stop-opacity="0.06" class="text-brand-600" />
+					<stop offset="100%" stop-color="currentColor" stop-opacity="0" class="text-brand-600" />
 				</linearGradient>
 			</defs>
 
@@ -363,7 +363,7 @@
 				d={linePath}
 				fill="none"
 				stroke="currentColor"
-				class="text-brand-500"
+				class="text-brand-600"
 				stroke-width="4"
 				stroke-linecap="round"
 				stroke-linejoin="round"
@@ -380,7 +380,7 @@
 					r={isLatest ? dotRadiusLatest : dotRadius}
 					fill="white"
 					stroke="currentColor"
-					class="text-brand-500"
+					class="text-brand-600"
 					stroke-width={dotStrokeWidth}
 					style="opacity:{mounted ? 1 : 0}; transition: opacity 0.35s ease-out {0.4 + (i / Math.max(1, points.length)) * 0.7}s;"
 				/>
@@ -404,7 +404,7 @@
 					r={isMobile ? 20 : 11}
 					fill="white"
 					stroke="currentColor"
-					class="text-brand-500"
+					class="text-brand-600"
 					stroke-width={dotStrokeWidth}
 				/>
 			{/if}

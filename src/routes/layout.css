@@ -5,28 +5,28 @@
 
 @theme {
 	/*
-	 * Brand ramp — derived from the Claude-designed "sparrow jungle" palette.
-	 * The 600 shade is the design's primary brand color (#2F7A3A — deeper,
-	 * more earthy than the previous emerald). Everything from buttons to
-	 * active-nav states to positive deltas reads from this ramp via the
-	 * existing brand-* Tailwind classes, so no page-by-page rewrite is
-	 * needed — the whole app picks up the new green.
+	 * Brand ramp — derived from the Claude-designed "navy slate" palette
+	 * (the EDITMODE-saved default in Budget Sparrow.html). The 600 shade
+	 * is the design's primary brand color (#1A2A4E — deep navy). Used for
+	 * dark CTA buttons, chart lines, and active-nav tints. Positive money
+	 * still reads green via --bs-pos; the brand is intentionally low-
+	 * saturation so the green pops.
 	 */
-	--color-brand-50: #f0f6e9;
-	--color-brand-100: #def0cd;
-	--color-brand-200: #bce0a0;
-	--color-brand-300: #98ce72;
-	--color-brand-400: #6fbf55;
-	--color-brand-500: #42a14e;
-	--color-brand-600: #2f7a3a; /* design primary */
-	--color-brand-700: #265e2d;
-	--color-brand-800: #1d4623;
-	--color-brand-900: #153319;
+	--color-brand-50: #f5f6fa;
+	--color-brand-100: #e2e6f0;
+	--color-brand-200: #c4cdde;
+	--color-brand-300: #94a4c6;
+	--color-brand-400: #5d76a8;
+	--color-brand-500: #28406f; /* design brand-2 */
+	--color-brand-600: #1a2a4e; /* design primary */
+	--color-brand-700: #131f3a;
+	--color-brand-800: #0c1528;
+	--color-brand-900: #060a18;
 
 	/* Surface tokens kept for legacy refs; new code should read --bs-surface. */
-	--color-surface: #fcf8ee;
-	--color-surface-muted: #f5efe0;
-	--color-surface-strong: #ebe0c5;
+	--color-surface: #ffffff;
+	--color-surface-muted: #fafaf7;
+	--color-surface-strong: #f4f4ee;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -36,28 +36,26 @@
    instead of hard-coded Tailwind slate-*.
    ────────────────────────────────────────────────────────────────────────── */
 :root {
-	/* Light — warm sand backdrop, cream cards, jungle green, mahogany accent */
-	--bs-bg: #f5efe0;
-	--bs-surface: #fcf8ee;
-	--bs-surface-2: #ebe0c5;
-	--bs-border: oklch(0.84 0.025 75);
-	--bs-border-2: oklch(0.76 0.035 75);
-	--bs-text: #1a1207;
-	--bs-text-2: #5a4628;
-	--bs-text-3: #9a8865;
-	--bs-brand: #2f7a3a;
-	--bs-brand-2: #42a14e;
-	--bs-brand-soft: oklch(0.91 0.09 142);
-	--bs-brand-tint: oklch(0.95 0.05 142);
-	--bs-accent: #8b5a2b;
-	--bs-accent-2: #b07842;
-	--bs-accent-soft: oklch(0.91 0.07 60);
-	--bs-accent-tint: oklch(0.95 0.045 60);
-	--bs-pos: #2f7a3a;
-	--bs-pos-soft: oklch(0.91 0.09 142);
-	--bs-neg: oklch(0.55 0.18 28);
-	--bs-neg-soft: oklch(0.92 0.05 28);
-	--bs-warn: oklch(0.65 0.16 65);
+	/* Light — Claude Design "Navy slate" palette, exact values from theme.js */
+	--bs-bg: #fafaf7;
+	--bs-surface: #ffffff;
+	--bs-surface-2: #f4f4ee;
+	--bs-border: oklch(0.92 0.005 250);
+	--bs-border-2: oklch(0.86 0.008 250);
+	--bs-text: #0f172a;
+	--bs-text-2: #475569;
+	--bs-text-3: #94a3b8;
+	--bs-brand: #1a2a4e;
+	--bs-brand-2: #28406f;
+	--bs-brand-soft: oklch(0.94 0.02 260);
+	--bs-brand-tint: oklch(0.97 0.01 260);
+	--bs-accent: oklch(0.55 0.12 50);
+	--bs-accent-soft: oklch(0.94 0.05 50);
+	--bs-pos: oklch(0.55 0.10 158);
+	--bs-pos-soft: oklch(0.94 0.04 158);
+	--bs-neg: oklch(0.55 0.13 25);
+	--bs-neg-soft: oklch(0.94 0.03 25);
+	--bs-warn: oklch(0.65 0.12 60);
 
 	/* Density / shape tokens */
 	--bs-radius: 14px;
@@ -78,28 +76,26 @@
 }
 
 :root.dark {
-	/* Dark — deep moss backdrop, warm cream text, brighter jungle green */
-	--bs-bg: #0f1408;
-	--bs-surface: #181f0d;
-	--bs-surface-2: #13180a;
-	--bs-border: oklch(0.30 0.04 130);
-	--bs-border-2: oklch(0.38 0.05 130);
-	--bs-text: #f1ead3;
-	--bs-text-2: #b8ad8a;
-	--bs-text-3: #7e7253;
-	--bs-brand: #6fbf55;
-	--bs-brand-2: #8fd86e;
-	--bs-brand-soft: oklch(0.30 0.10 142);
-	--bs-brand-tint: oklch(0.22 0.06 142);
-	--bs-accent: #d49560;
-	--bs-accent-2: #e2ac7c;
-	--bs-accent-soft: oklch(0.30 0.08 60);
-	--bs-accent-tint: oklch(0.22 0.05 60);
-	--bs-pos: #6fbf55;
-	--bs-pos-soft: oklch(0.30 0.10 142);
-	--bs-neg: oklch(0.70 0.17 28);
-	--bs-neg-soft: oklch(0.30 0.08 28);
-	--bs-warn: oklch(0.74 0.16 65);
+	/* Dark — Claude Design "Navy slate" dark variant, exact values from theme.js */
+	--bs-bg: #0b1020;
+	--bs-surface: #111733;
+	--bs-surface-2: #0f1530;
+	--bs-border: oklch(0.28 0.02 260);
+	--bs-border-2: oklch(0.34 0.02 260);
+	--bs-text: #e6e8f0;
+	--bs-text-2: #9aa3be;
+	--bs-text-3: #5b6385;
+	--bs-brand: #c4ccff;
+	--bs-brand-2: #a6b0f0;
+	--bs-brand-soft: oklch(0.28 0.05 260);
+	--bs-brand-tint: oklch(0.22 0.04 260);
+	--bs-accent: oklch(0.72 0.12 50);
+	--bs-accent-soft: oklch(0.30 0.06 50);
+	--bs-pos: oklch(0.72 0.10 158);
+	--bs-pos-soft: oklch(0.30 0.05 158);
+	--bs-neg: oklch(0.68 0.13 25);
+	--bs-neg-soft: oklch(0.28 0.06 25);
+	--bs-warn: oklch(0.74 0.12 60);
 	--bs-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
