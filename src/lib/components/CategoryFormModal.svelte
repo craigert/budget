@@ -38,6 +38,23 @@
 	let iconQuery = $state('');
 	let isOneTime = $state(false);
 	let budgetAmount = $state(0);
+	let showAllIcons = $state(false);
+
+	const COMMON_ICONS = [
+		'finance-ecommerce/coins-01',
+		'finance-ecommerce/shopping-cart',
+		'general/home',
+		'maps-travel/car',
+		'general/heart',
+		'education/briefcase-01'
+	];
+
+	// If the current icon isn't in the common set, surface it so it stays visible
+	const compactIcons = $derived.by(() => {
+		const icons = [...COMMON_ICONS];
+		if (!icons.includes(form.icon)) icons.push(form.icon);
+		return icons;
+	});
 
 	// Reset form whenever the modal opens
 	$effect(() => {
@@ -59,6 +76,7 @@
 			}
 			isOneTime = false;
 			budgetAmount = 0;
+			showAllIcons = false;
 			iconQuery = '';
 		}
 	});
@@ -185,37 +203,65 @@
 					<Icon name={form.icon} size={26} />
 				</div>
 			</div>
-			<input
-				type="search"
-				bind:value={iconQuery}
-				placeholder="Search icons…"
-				class="mb-3 w-full"
-			/>
-			<div class="space-y-3">
-				{#each filteredGroups as g (g.label)}
-					<div>
-						<div class="section-label mb-1.5">{g.label}</div>
-						<div class="grid grid-cols-8 gap-1 sm:grid-cols-10">
-							{#each g.icons as p (p)}
-								<button
-									type="button"
-									title={iconLabel(p)}
-									class="flex h-9 w-9 items-center justify-center rounded transition-colors {form.icon === p
-										? 'bg-brand-500 text-white'
-										: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}"
-									onclick={() => (form.icon = p)}
-									aria-label={iconLabel(p)}
-								>
-									<Icon name={p} size={20} />
-								</button>
-							{/each}
+
+			{#if showAllIcons}
+				<!-- Expanded: search + full grouped list -->
+				<input type="search" bind:value={iconQuery} placeholder="Search icons…" class="mb-3 w-full" />
+				<div class="space-y-3">
+					{#each filteredGroups as g (g.label)}
+						<div>
+							<div class="section-label mb-1.5">{g.label}</div>
+							<div class="grid grid-cols-8 gap-1 sm:grid-cols-10">
+								{#each g.icons as p (p)}
+									<button
+										type="button"
+										title={iconLabel(p)}
+										class="flex h-9 w-9 items-center justify-center rounded transition-colors {form.icon === p
+											? 'bg-brand-500 text-white'
+											: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}"
+										onclick={() => { form.icon = p; showAllIcons = false; }}
+										aria-label={iconLabel(p)}
+									>
+										<Icon name={p} size={20} />
+									</button>
+								{/each}
+							</div>
 						</div>
-					</div>
-				{/each}
-				{#if filteredGroups.length === 0}
-					<p class="py-4 text-center text-sm text-slate-500">No icons match "{iconQuery}".</p>
-				{/if}
-			</div>
+					{/each}
+					{#if filteredGroups.length === 0}
+						<p class="py-4 text-center text-sm text-slate-500">No icons match "{iconQuery}".</p>
+					{/if}
+				</div>
+				<button type="button" class="mt-2 text-xs text-slate-500 hover:underline" onclick={() => (showAllIcons = false)}>
+					Show less
+				</button>
+			{:else}
+				<!-- Compact: common icons + current selection + expand button -->
+				<div class="flex flex-wrap gap-1">
+					{#each compactIcons as p (p)}
+						<button
+							type="button"
+							title={iconLabel(p)}
+							class="flex h-9 w-9 items-center justify-center rounded transition-colors {form.icon === p
+								? 'bg-brand-500 text-white'
+								: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}"
+							onclick={() => (form.icon = p)}
+							aria-label={iconLabel(p)}
+						>
+							<Icon name={p} size={20} />
+						</button>
+					{/each}
+					<button
+						type="button"
+						class="flex h-9 w-9 items-center justify-center rounded text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+						onclick={() => (showAllIcons = true)}
+						aria-label="Show all icons"
+						title="More icons"
+					>
+						···
+					</button>
+				</div>
+			{/if}
 		</div>
 
 		<div>
