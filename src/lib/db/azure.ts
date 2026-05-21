@@ -19,7 +19,39 @@ export const AZURE_DEFAULTS: Pick<AzureDocIntelConfig, 'model' | 'apiVersion'> =
 	apiVersion: '2024-11-30'
 };
 
+/**
+ * Build-time env config (see .env.example). When VITE_AZURE_DOC_INTEL_ENDPOINT
+ * AND VITE_AZURE_DOC_INTEL_KEY are both set, the app uses these values and
+ * the Settings UI hides its input fields.
+ *
+ * ⚠ These ship inside the client JS bundle. They are hidden from the Settings
+ * UI, but anyone running DevTools on the deployed site can extract them. For
+ * a real multi-user product, route the Azure call through a server-side proxy
+ * (Cloudflare Worker / Azure Function) that holds the key as a secret.
+ */
+function readEnvConfig(): AzureDocIntelConfig | null {
+	const env = import.meta.env as Record<string, string | undefined>;
+	const endpoint = env.VITE_AZURE_DOC_INTEL_ENDPOINT?.trim();
+	const key = env.VITE_AZURE_DOC_INTEL_KEY?.trim();
+	if (!endpoint || !key) return null;
+	return {
+		endpoint: endpoint.replace(/\/+$/, ''),
+		key,
+		model: env.VITE_AZURE_DOC_INTEL_MODEL?.trim() || AZURE_DEFAULTS.model,
+		apiVersion: env.VITE_AZURE_DOC_INTEL_API_VERSION?.trim() || AZURE_DEFAULTS.apiVersion
+	};
+}
+
+/** True when a complete config was baked in via env vars at build time. */
+export function isAzureConfiguredFromEnv(): boolean {
+	return readEnvConfig() !== null;
+}
+
 export async function getAzureConfig(): Promise<AzureDocIntelConfig | null> {
+	// Env vars take precedence so devs can override the user-stored config.
+	const envCfg = readEnvConfig();
+	if (envCfg) return envCfg;
+
 	const [ep, key, model, apiVersion] = await Promise.all([
 		db.settings.get(KEYS.endpoint),
 		db.settings.get(KEYS.key),

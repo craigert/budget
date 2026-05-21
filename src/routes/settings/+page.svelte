@@ -10,6 +10,7 @@
 		AZURE_DEFAULTS,
 		clearAzureConfig,
 		getAzureConfig,
+		isAzureConfiguredFromEnv,
 		saveAzureConfig,
 		testAzureConfig,
 		type AzureDocIntelConfig
@@ -39,6 +40,7 @@
 	let azureBusy = $state(false);
 	let azureStatus = $state<{ ok: boolean; message: string } | null>(null);
 	let azureConfigured = $state(false);
+	const azureFromEnv = isAzureConfiguredFromEnv();
 
 	$effect(() => {
 		(async () => {
@@ -243,23 +245,37 @@
 					When configured, captured receipts are sent to Azure's prebuilt-receipt model and the merchant / total / date are auto-filled.
 				</p>
 			</div>
-			{#if azureConfigured}
+			{#if azureFromEnv || azureConfigured}
 				<span class="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-500/20 dark:text-brand-100">Active</span>
 			{/if}
 		</div>
 
-		<!-- Dev / demo warning -->
-		<div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-700/50 dark:bg-amber-900/20">
-			<div class="mb-1 font-semibold text-amber-800 dark:text-amber-200">⚠ Dev / demo configuration — not production-safe</div>
-			<ul class="list-inside list-disc space-y-0.5 text-amber-800/90 dark:text-amber-200/85">
-				<li>The key is stored in this browser's IndexedDB and is visible to anyone with DevTools access.</li>
-				<li>Every receipt scan sends the key from the browser to Azure — visible in the Network tab.</li>
-				<li>Azure CORS must allow this app's origin, or the request will fail. Typically requires a proxy (Cloudflare Worker, Azure Function, APIM).</li>
-				<li>For multi-user / production, move this to a server-side proxy that holds the key as a secret.</li>
-			</ul>
-		</div>
+		{#if azureFromEnv}
+			<!-- Env-configured: hide inputs, show a status note instead. -->
+			<div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+				<div class="mb-1 font-medium">Configured via environment variables</div>
+				<p class="text-xs text-slate-500">
+					The endpoint and key are baked into the deployed app via
+					<code class="rounded bg-slate-100 px-1 dark:bg-slate-700">VITE_AZURE_DOC_INTEL_*</code>
+					(see <code class="rounded bg-slate-100 px-1 dark:bg-slate-700">.env.example</code>). To change them, update
+					<code class="rounded bg-slate-100 px-1 dark:bg-slate-700">.env.local</code>
+					and redeploy.
+				</p>
+			</div>
+		{:else}
+			<!-- Dev / demo warning -->
+			<div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-700/50 dark:bg-amber-900/20">
+				<div class="mb-1 font-semibold text-amber-800 dark:text-amber-200">⚠ Dev / demo configuration — not production-safe</div>
+				<ul class="list-inside list-disc space-y-0.5 text-amber-800/90 dark:text-amber-200/85">
+					<li>The key is stored in this browser's IndexedDB and is visible to anyone with DevTools access.</li>
+					<li>Every receipt scan sends the key from the browser to Azure — visible in the Network tab.</li>
+					<li>Azure CORS must allow this app's origin, or the request will fail. Typically requires a proxy (Cloudflare Worker, Azure Function, APIM).</li>
+					<li>For multi-user / production, move this to a server-side proxy that holds the key as a secret.</li>
+					<li>To set the key without exposing it here, populate <code class="rounded bg-amber-100 px-1 dark:bg-amber-900/40">.env.local</code> per <code class="rounded bg-amber-100 px-1 dark:bg-amber-900/40">.env.example</code> instead.</li>
+				</ul>
+			</div>
 
-		<div class="space-y-3">
+			<div class="space-y-3">
 			<div>
 				<label for="az-endpoint" class="mb-1 block text-sm font-medium">Endpoint</label>
 				<input
@@ -332,7 +348,8 @@
 					{azureStatus.message}
 				</p>
 			{/if}
-		</div>
+			</div>
+		{/if}
 	</section>
 
 	<section class="rounded-xl border border-red-200 bg-red-50 p-5 dark:border-red-900/40 dark:bg-red-950/30">
