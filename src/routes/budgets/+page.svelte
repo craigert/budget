@@ -224,6 +224,7 @@
 								<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
 								<input
 									type="number"
+									inputmode="decimal"
 									step="0.01"
 									min="0"
 									class="w-full pl-6 text-right tabular-nums"

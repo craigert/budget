@@ -850,7 +850,7 @@
 					</div>
 					<div>
 						<label for="m-miles" class="mb-1 block text-sm font-medium">Miles</label>
-						<input id="m-miles" type="number" step="0.1" min="0" bind:value={mileageForm.miles} use:clearOnFocus class="w-full" required />
+						<input id="m-miles" type="number" inputmode="decimal" step="0.1" min="0" bind:value={mileageForm.miles} use:clearOnFocus class="w-full" required />
 					</div>
 				</div>
 				<div>

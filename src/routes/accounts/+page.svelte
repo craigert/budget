@@ -204,7 +204,7 @@
 				<label for="opening" class="mb-1 block text-sm font-medium">Opening balance</label>
 				<div class="relative">
 					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
-					<input id="opening" type="number" step="0.01" bind:value={form.openingBalance} use:clearOnFocus class="w-full pl-6" />
+					<input id="opening" type="number" inputmode="decimal" step="0.01" bind:value={form.openingBalance} use:clearOnFocus class="w-full pl-6" />
 				</div>
 			</div>
 		</div>
