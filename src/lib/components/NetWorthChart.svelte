@@ -34,22 +34,42 @@
 	const padB = 40;
 	const innerW = W - padL - padR;
 
-	let isMobile = $state(false);
+	// Track the actual rendered chart-card width via ResizeObserver, so the
+	// chart picks its aspect from CONTAINER width (not viewport). The chart
+	// card on a tablet or in a 2-col grid is much narrower than the viewport,
+	// so a viewport-based breakpoint was leaving it squished.
+	let containerEl: HTMLDivElement | undefined = $state();
+	let containerW = $state(0);
 	$effect(() => {
-		if (typeof window === 'undefined') return;
-		const mq = window.matchMedia('(max-width: 640px)');
-		isMobile = mq.matches;
-		const listener = (e: MediaQueryListEvent) => (isMobile = e.matches);
-		mq.addEventListener('change', listener);
-		return () => mq.removeEventListener('change', listener);
+		if (!containerEl) return;
+		// Seed with the synchronous measurement so we don't render one frame
+		// at the 'wide' fallback tier.
+		const rect = containerEl.getBoundingClientRect();
+		if (rect.width) containerW = rect.width;
+		const ro = new ResizeObserver((entries) => {
+			const w = entries[0]?.contentRect.width;
+			if (w) containerW = w;
+		});
+		ro.observe(containerEl);
+		return () => ro.disconnect();
 	});
-	// Mobile: ~16:9 ratio (~190px tall at 343px viewport) — enough room
-	// to actually read the line. Desktop stays a shallow trend strip.
-	const H = $derived(isMobile ? 900 : 250);
+
+	// Three-tier aspect — each tier kept tall enough to read clearly:
+	//   narrow  (< 500px)   → 16:9     (phone, ~190px at 343 wide)
+	//   medium  (500-1100)  → ~2.7:1   (tablet / narrow desktop, ~350px at 935 wide)
+	//   wide    (≥ 1100)    → ~4:1     (wide desktop, ~325px at 1300 wide)
+	const tier = $derived.by<'narrow' | 'medium' | 'wide'>(() => {
+		if (containerW === 0) return 'medium'; // safe default before measurement
+		if (containerW < 500) return 'narrow';
+		if (containerW < 1100) return 'medium';
+		return 'wide';
+	});
+	const H = $derived(tier === 'narrow' ? 900 : tier === 'medium' ? 600 : 400);
 	const innerH = $derived(H - padT - padB);
-	const dotRadius = $derived(isMobile ? 24 : 7);
-	const dotRadiusLatest = $derived(isMobile ? 30 : 10);
-	const dotStrokeWidth = $derived(isMobile ? 10 : 4);
+	const dotRadius = $derived(tier === 'narrow' ? 24 : tier === 'medium' ? 14 : 7);
+	const dotRadiusLatest = $derived(tier === 'narrow' ? 30 : tier === 'medium' ? 18 : 10);
+	const dotStrokeWidth = $derived(tier === 'narrow' ? 10 : tier === 'medium' ? 6 : 4);
+	const isMobile = $derived(tier === 'narrow'); // reused by hover-ring sizing
 
 	const yDomain = $derived.by(() => {
 		if (points.length === 0) return { min: 0, max: 1 };
@@ -219,7 +239,7 @@
 			{/if}
 		</div>
 
-		<div class="relative">
+		<div class="relative" bind:this={containerEl}>
 		<svg
 			bind:this={svgEl}
 			viewBox="0 0 {W} {H}"
