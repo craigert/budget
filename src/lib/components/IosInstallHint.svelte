@@ -17,7 +17,10 @@
 	import { onMount } from 'svelte';
 	import Icon from './Icon.svelte';
 
-	const STORAGE_KEY = 'ios-install-hint-dismissed';
+	// v2: bumped so devices that dismissed the original button-styled card
+	// see the redesigned instructional version. Increment again if the copy
+	// or layout changes materially.
+	const STORAGE_KEY = 'ios-install-hint-dismissed-v2';
 
 	let visible = $state(false);
 

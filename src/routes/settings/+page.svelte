@@ -124,6 +124,34 @@
 		busy = false;
 		status = 'All data wiped.';
 	}
+
+	/**
+	 * Tears down the service worker + Workbox caches and reloads. Useful when
+	 * an old SW is serving stale HTML that's missing newer PWA capabilities
+	 * (manifest link, install criteria, etc.) — the user otherwise has to
+	 * go into browser site-settings to clear it.
+	 *
+	 * Leaves IndexedDB / localStorage alone so the user's data survives.
+	 */
+	async function resetPwaCache() {
+		if (!confirm('Unregister the service worker and clear PWA caches, then reload? Your data stays.')) return;
+		busy = true;
+		status = 'Resetting PWA cache…';
+		try {
+			if ('serviceWorker' in navigator) {
+				const regs = await navigator.serviceWorker.getRegistrations();
+				await Promise.all(regs.map((r) => r.unregister()));
+			}
+			if ('caches' in window) {
+				const keys = await caches.keys();
+				await Promise.all(keys.map((k) => caches.delete(k)));
+			}
+			location.reload();
+		} catch (err) {
+			status = `Reset failed: ${(err as Error).message}`;
+			busy = false;
+		}
+	}
 </script>
 
 <PageHeader title="Settings" />
@@ -189,6 +217,15 @@
 		{#if status}
 			<p class="mt-3 text-sm text-slate-600 dark:text-slate-400">{status}</p>
 		{/if}
+	</section>
+
+	<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+		<h2 class="mb-2 text-lg font-semibold">Troubleshooting</h2>
+		<p class="mb-4 text-sm text-slate-500">
+			If the app looks out of date, isn't offering to install, or is serving an old version, reset
+			the service worker cache. Your transactions, budgets, and settings are kept.
+		</p>
+		<Button variant="secondary" onclick={resetPwaCache} disabled={busy}>Reset PWA cache &amp; reload</Button>
 	</section>
 
 	<section class="rounded-xl border border-red-200 bg-red-50 p-5 dark:border-red-900/40 dark:bg-red-950/30">
