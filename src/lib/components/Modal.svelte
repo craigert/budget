@@ -18,7 +18,7 @@
 
 {#if open}
 	<div
-		class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm md:items-center md:p-4"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
 		role="dialog"
 		aria-modal="true"
 		onclick={onclose}
@@ -26,7 +26,7 @@
 		tabindex="-1"
 	>
 		<div
-			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl md:rounded-2xl dark:bg-slate-900"
+			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900"
 			onclick={(e) => e.stopPropagation()}
 			role="document"
 			onkeydown={(e) => e.stopPropagation()}
