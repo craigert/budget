@@ -57,28 +57,28 @@
 	</div>
 </aside>
 
-<!-- Mobile bottom nav (5 slots: 4 primary + Settings always at the end) -->
+<!-- Mobile bottom nav: every item, with Settings pinned at the end -->
 <nav
 	class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden dark:border-slate-800 dark:bg-slate-900"
 >
-	{#each items.slice(0, 4) as item (item.href)}
+	{#each items as item (item.href)}
 		<a
 			href={`${base}${item.href === '/' ? '/' : item.href}`}
-			class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {isActive(item.href)
+			class="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px] {isActive(item.href)
 				? 'text-brand-600 dark:text-brand-300'
 				: 'text-slate-500 dark:text-slate-400'}"
 		>
-			<Icon name={item.icon} size={22} />
-			<span class="leading-none">{item.label}</span>
+			<Icon name={item.icon} size={20} />
+			<span class="w-full truncate text-center leading-none">{item.label}</span>
 		</a>
 	{/each}
 	<a
 		href={`${base}${settingsItem.href}`}
-		class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {isActive(settingsItem.href)
+		class="flex min-w-0 flex-1 flex-col items-center gap-0.5 border-l border-slate-200 px-1 py-2 text-[10px] dark:border-slate-800 {isActive(settingsItem.href)
 			? 'text-brand-600 dark:text-brand-300'
 			: 'text-slate-500 dark:text-slate-400'}"
 	>
-		<Icon name={settingsItem.icon} size={22} />
-		<span class="leading-none">{settingsItem.label}</span>
+		<Icon name={settingsItem.icon} size={20} />
+		<span class="w-full truncate text-center leading-none">{settingsItem.label}</span>
 	</a>
 </nav>
