@@ -409,6 +409,175 @@
 		const acct = accountMap.get(t.accountId);
 		return { cat, acct };
 	}
+
+	/**
+	 * Bundles every computed figure on this page into a single plain-text
+	 * summary, formatted as a FreeTaxUSA hand-off worksheet. Each section
+	 * cites the matching IRS form/schedule line so you can drop numbers
+	 * straight into FreeTaxUSA without hunting.
+	 *
+	 * Plain text rather than CSV because the user is transcribing values
+	 * into a tax product, not feeding a spreadsheet.
+	 */
+	function buildFreeTaxUSAReport(): string {
+		const usd = (n: number) =>
+			n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+		const line = (label: string, value: string | number, indent = 0) => {
+			const pad = '  '.repeat(indent);
+			const v = typeof value === 'number' ? usd(value) : value;
+			return `${pad}${label.padEnd(60 - indent * 2)} ${v}`;
+		};
+		const rule = '─'.repeat(72);
+		// Schedule C line numbers per EXPENSE_SECTIONS key. Single representative
+		// line per category — actual filings may split across multiple Sch C lines.
+		const SCH_C_LINE: Record<string, string> = {
+			labor: 'Sch C line 11 (Contract labor) / line 26 (Wages)',
+			admin: 'Sch C line 8 (Advertising) / line 17 (Legal & prof) / line 18 (Office)',
+			operations: 'Sch C line 20–25 (Rent, repairs, supplies, utilities)',
+			vehicle: 'Sch C line 9 (Car & truck expenses)',
+			health: 'Schedule 1 line 16 (Self-employed health insurance)',
+			homeoffice: 'Sch C line 30 (Home office — via Form 8829)'
+		};
+		const out: string[] = [];
+
+		out.push(`BudgetSparrow — FreeTaxUSA hand-off worksheet`);
+		out.push(`Tax year ${year}`);
+		out.push(`Generated ${new Date().toLocaleString()}`);
+		out.push('');
+		out.push(`Drop these numbers into FreeTaxUSA's matching screens. Each section`);
+		out.push(`cites the relevant IRS form/schedule line. Estimates only — verify`);
+		out.push(`against statements & receipts before filing.`);
+		out.push('');
+
+		// --- Schedule C: Business income / expenses ---
+		if (businessSummary.length > 0) {
+			out.push(rule);
+			out.push(`SCHEDULE C — Self-employment (Form 1040)`);
+			out.push(rule);
+			for (const b of businessSummary) {
+				out.push('');
+				out.push(`Business: ${b.business.name}`);
+				out.push(line('Gross receipts (line 1)', b.income, 1));
+				out.push(line('Total expenses (line 28)', b.expense, 1));
+				out.push(line('Net profit (line 31)', b.profit, 1));
+				if (b.expenseSections.some((s) => s.total > 0)) {
+					out.push('');
+					out.push(`  Expense breakdown:`);
+					for (const s of b.expenseSections) {
+						if (s.total > 0) {
+							out.push(line(`${s.label}`, s.total, 2));
+							const ref = SCH_C_LINE[s.key];
+							if (ref) out.push(`      → ${ref}`);
+						}
+					}
+					if (b.otherExpenseTxs.length > 0) {
+						const otherTotal = sumAbs(b.otherExpenseTxs);
+						out.push(line('Other expenses', otherTotal, 2));
+						out.push(`      → Sch C line 27a (Other expenses, itemize Part V)`);
+					}
+				}
+			}
+			out.push('');
+		}
+
+		// --- Schedule A: Itemized deductions ---
+		out.push(rule);
+		out.push(`SCHEDULE A — Itemized deductions`);
+		out.push(rule);
+		out.push(line('Medical & dental expenses (line 1)', medicalTotal));
+		out.push(line('State & local taxes paid', saltTotal));
+		out.push(line('  ↳ Deductible (capped at $10,000, line 5e)', saltDeductible));
+		out.push(line('Mortgage interest (line 8a)', mortgageTotal));
+		out.push(line('Charitable contributions — cash (line 11)', charityTotal));
+		out.push('');
+
+		// --- Mileage (Schedule C or Schedule A) ---
+		if (mileageTotalDeduction > 0) {
+			out.push(rule);
+			out.push(`MILEAGE`);
+			out.push(rule);
+			if (mileageBuckets.business.deduction > 0) {
+				out.push(line(`Business — ${mileageBuckets.business.miles} mi → deduction`, mileageBuckets.business.deduction));
+				out.push(`  → Schedule C line 9 (Car and truck expenses)`);
+			}
+			if (mileageBuckets.medical.deduction > 0) {
+				out.push(line(`Medical — ${mileageBuckets.medical.miles} mi → deduction`, mileageBuckets.medical.deduction));
+				out.push(`  → Schedule A line 1 (Medical & dental expenses)`);
+			}
+			if (mileageBuckets.charity.deduction > 0) {
+				out.push(line(`Charity — ${mileageBuckets.charity.miles} mi → deduction`, mileageBuckets.charity.deduction));
+				out.push(`  → Schedule A line 11 (Charitable contributions)`);
+			}
+			out.push('');
+		}
+
+		// --- Retirement & HSA ---
+		const usedRetirement = retirementBuckets.filter((b) => b.total > 0);
+		if (usedRetirement.length > 0) {
+			out.push(rule);
+			out.push(`RETIREMENT & HSA CONTRIBUTIONS`);
+			out.push(rule);
+			for (const b of usedRetirement) {
+				out.push(line(`${b.plan.label}`, b.total));
+				out.push(`  → ${b.plan.schedule}`);
+				if (b.plan.limit) {
+					out.push(`  → Limit: ${b.plan.limitNote ?? usd(b.plan.limit)}`);
+				}
+			}
+			out.push('');
+			out.push(line('Total above-the-line retirement deduction', retirementDeductibleTotal));
+			out.push('');
+		}
+
+		// --- Education ---
+		if (educationTotal > 0) {
+			out.push(rule);
+			out.push(`EDUCATION (Form 8863 — credits) / Form 1040 line 21 (deduction)`);
+			out.push(rule);
+			if (educationByType.tuition.length > 0)
+				out.push(line('Tuition & enrollment fees', sumAbs(educationByType.tuition)));
+			if (educationByType.books.length > 0)
+				out.push(line('Books & course materials', sumAbs(educationByType.books)));
+			if (educationByType.supplies.length > 0)
+				out.push(line('Supplies', sumAbs(educationByType.supplies)));
+			if (educationByType.equipment.length > 0)
+				out.push(line('Equipment (laptop, software)', sumAbs(educationByType.equipment)));
+			if (educationByType.other.length > 0)
+				out.push(line('Other education-related', sumAbs(educationByType.other)));
+			out.push('');
+			out.push(line('Total education expenses', educationTotal));
+			out.push('');
+		}
+
+		// --- AGI if user set one ---
+		if (agi > 0) {
+			out.push(rule);
+			out.push(`AGI REFERENCE`);
+			out.push(rule);
+			out.push(line(`AGI (user-supplied for ${year})`, agi));
+			out.push('');
+		}
+
+		out.push(rule);
+		out.push(`These figures are estimates. Verify against your statements and`);
+		out.push(`receipts. Consult a tax professional for advice on your situation.`);
+		out.push('');
+
+		return out.join('\n');
+	}
+
+	function exportFreeTaxUSA() {
+		const text = buildFreeTaxUSAReport();
+		const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `BudgetSparrow-FreeTaxUSA-${year}.txt`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+	}
 </script>
 
 <PageHeader title="Taxes" subtitle="Year-end summary for FreeTaxUSA — {year}">
@@ -1051,10 +1220,24 @@
 
 	<!-- FreeTaxUSA handoff banner -->
 	<section class="rounded-xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10">
-		<h2 class="text-lg font-semibold text-brand-700 dark:text-brand-200">Ready for FreeTaxUSA</h2>
-		<p class="mt-1 text-sm text-brand-700/80 dark:text-brand-200/80">
-			Type the numbers above into the matching screens in FreeTaxUSA. Tip: open this page in one window and your tax return in another.
-		</p>
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<h2 class="text-lg font-semibold text-brand-700 dark:text-brand-200">Ready for FreeTaxUSA</h2>
+				<p class="mt-1 text-sm text-brand-700/80 dark:text-brand-200/80">
+					Type the numbers above into the matching screens in FreeTaxUSA, or download the
+					worksheet below to keep a clean reference open while you fill out your return.
+				</p>
+			</div>
+			<button
+				type="button"
+				onclick={exportFreeTaxUSA}
+				class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+				style="background: var(--bs-text); color: var(--bs-bg);"
+			>
+				<Icon name="general/download-01" size={14} />
+				Export to FreeTaxUSA
+			</button>
+		</div>
 		<div class="mt-3 rounded-lg border border-brand-200/60 bg-white/50 px-4 py-3 text-xs text-brand-800/70 dark:border-brand-500/20 dark:bg-slate-900/40 dark:text-brand-200/60">
 			<span class="font-semibold">Heads up:</span> The figures on this page are estimates based on how your transactions are categorized — they're a helpful starting point, not a guarantee. IRS definitions can be nuanced, and not every transaction that looks like a deduction will qualify. Review each amount against your actual receipts and statements, apply your own judgment, and consult a tax professional if you're unsure.
 		</div>
