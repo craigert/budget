@@ -14,7 +14,7 @@
 	// Half-height aspect — wide and shallow for a trend strip.
 	const W = 1600;
 	const H = 250;
-	const padL = 180; // wide enough for $1,000,000.00 labels
+	const padL = 96; // tight gutter sized for the current font-size 13 labels
 	const padR = 40;
 	const padT = 22;
 	const padB = 40;
@@ -221,7 +221,7 @@
 					stroke-width="1.5"
 				/>
 				<text
-					x={padL - 16}
+					x={padL - 8}
 					y={t.y}
 					text-anchor="end"
 					dominant-baseline="middle"
