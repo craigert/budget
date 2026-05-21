@@ -553,8 +553,14 @@
 					</div>
 					<div class="flex shrink-0 items-center gap-1">
 						{#if businesses.value.length > 0}
+							<!-- Inline business reassign — desktop only. On mobile the
+							     control would dominate the row and force the middle
+							     column to ~50px, which wraps the date word-by-word.
+							     Mobile users still see the business via the chip in
+							     the meta line below; assignment happens via the
+							     row's edit modal. -->
 							<select
-								class="shrink-0 text-xs"
+								class="hidden shrink-0 text-xs md:block"
 								value={t.businessId ?? ''}
 								onchange={(e) => {
 									const v = (e.currentTarget as HTMLSelectElement).value;
