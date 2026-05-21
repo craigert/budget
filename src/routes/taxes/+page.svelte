@@ -63,24 +63,50 @@
 	const sumExpenses = (arr: Transaction[]) => arr.filter((t) => t.amount < 0).reduce((s, t) => s + -t.amount, 0);
 	const sumIncome = (arr: Transaction[]) => arr.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
 
+	// === Schedule C expense subsection definitions ===
+	const EXPENSE_SECTIONS = [
+		{ key: 'labor',      label: 'Labor',            pattern: /\b(labor|payroll|contractor|contractors|wage|wages|salary|salaries|subcontract|employee)\b/i },
+		{ key: 'admin',      label: 'Administrative',   pattern: /\b(admin|software|subscription|legal|accounting|advertis|marketing|professional|bank.?fee|dues|license|permit|office supply|postage|print)\b/i },
+		{ key: 'operations', label: 'Operations',       pattern: /\b(operat|material|supply|supplies|equipment|repair|mainten|utilit|rent|shipping|inventory|telephone|phone|internet|hosting)\b/i },
+		{ key: 'vehicle',    label: 'Vehicle',          pattern: /\b(vehicle|auto|car|gas|fuel|mileage|transport|parking|toll)\b/i },
+		{ key: 'health',     label: 'Health Insurance', pattern: /\b(health insurance|health|medical insurance)\b/i },
+		{ key: 'homeoffice', label: 'Home Office',      pattern: /home.?office/i },
+	] as const;
+
+	function classifyExpenseCat(categoryName: string): string {
+		for (const s of EXPENSE_SECTIONS) {
+			if (s.pattern.test(categoryName)) return s.key;
+		}
+		return 'other';
+	}
+
 	// === Schedule C per business ===
 	const businessSummary = $derived.by(() => {
 		return businesses.value.map((b) => {
 			const rows = txs.value.filter((t) => t.businessId === b.id);
 			const income = sumIncome(rows);
 			const expense = sumExpenses(rows);
-			const byCat = new Map<number | null, number>();
-			for (const t of rows.filter((t) => t.amount < 0)) {
-				byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + -t.amount);
+
+			const incomeRows = rows.filter((t) => t.amount > 0);
+			const expenseTxs = rows.filter((t) => t.amount < 0);
+
+			// Bucket expense transactions into Schedule C subsections
+			const sectionBuckets = new Map<string, typeof expenseTxs>();
+			for (const t of expenseTxs) {
+				const catName = t.categoryId != null ? (categoryMap.get(t.categoryId)?.name ?? '') : '';
+				const sk = classifyExpenseCat(catName);
+				if (!sectionBuckets.has(sk)) sectionBuckets.set(sk, []);
+				sectionBuckets.get(sk)!.push(t);
 			}
-			const categoryRows = Array.from(byCat.entries())
-				.map(([categoryId, amount]) => ({
-					categoryId,
-					categoryName: categoryId != null ? categoryMap.get(categoryId)?.name ?? 'Uncategorized' : 'Uncategorized',
-					amount
-				}))
-				.sort((a, b) => b.amount - a.amount);
-			return { business: b, income, expense, profit: income - expense, rows, categoryRows };
+			const expenseSections = EXPENSE_SECTIONS.map((s) => ({
+				key: s.key,
+				label: s.label,
+				txs: sectionBuckets.get(s.key) ?? [],
+				total: sumAbs(sectionBuckets.get(s.key) ?? [])
+			}));
+			const otherExpenseTxs = sectionBuckets.get('other') ?? [];
+
+			return { business: b, income, expense, profit: income - expense, rows, incomeRows, expenseSections, otherExpenseTxs };
 		});
 	});
 
@@ -395,31 +421,112 @@
 							</button>
 						</div>
 						{#if isOpen(key)}
-							<div class="border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-								<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Expenses by category</div>
-								<ul class="mb-4 divide-y divide-slate-100 dark:divide-slate-800">
-									{#each b.categoryRows as row (row.categoryId)}
-										<li class="flex items-center justify-between py-1.5 text-sm">
-											<span>{row.categoryName}</span>
-											<span class="tabular-nums">{money(row.amount)}</span>
-										</li>
-									{/each}
-								</ul>
-								<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">All transactions</div>
-								<ul class="max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-									{#each b.rows.slice(0, 100) as t (t.id)}
-										{@const r = renderTxRow(t)}
-										<li class="flex items-center gap-2 px-2 py-1.5 text-xs">
-											<span class="w-20 shrink-0 text-slate-500">{t.date}</span>
-											<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
-											<span class="w-28 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
-											<span class="w-20 shrink-0 text-right tabular-nums {t.amount > 0 ? 'text-brand-500' : ''}">{money(t.amount)}</span>
-										</li>
-									{/each}
-									{#if b.rows.length > 100}
-										<li class="px-2 py-2 text-center text-xs text-slate-500">Showing first 100 of {b.rows.length}</li>
+							<div class="border-t border-slate-200 dark:border-slate-800">
+
+								<!-- Income -->
+								<div class="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+									<button
+										class="flex w-full items-center justify-between text-left"
+										onclick={() => toggleExpand(`${key}-income`)}
+									>
+										<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Income</span>
+										<div class="flex items-center gap-3">
+											<span class="tabular-nums font-medium text-brand-500">{money(b.income)}</span>
+											<span class="text-xs text-slate-400">{isOpen(`${key}-income`) ? '−' : '+'}</span>
+										</div>
+									</button>
+									{#if isOpen(`${key}-income`)}
+										{#if b.incomeRows.length > 0}
+											<ul class="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+												{#each b.incomeRows as t (t.id)}
+													{@const r = renderTxRow(t)}
+													<li class="flex items-center gap-2 px-2 py-1.5 text-xs">
+														<span class="w-20 shrink-0 text-slate-500">{t.date}</span>
+														<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+														<span class="w-28 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+														<span class="w-20 shrink-0 text-right tabular-nums text-brand-500">{money(t.amount)}</span>
+													</li>
+												{/each}
+											</ul>
+										{:else}
+											<p class="mt-2 text-xs text-slate-500">No income transactions for this business.</p>
+										{/if}
 									{/if}
-								</ul>
+								</div>
+
+								<!-- Expenses -->
+								<div class="px-4 py-3">
+									<div class="mb-3 flex items-center justify-between">
+										<span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Expenses</span>
+										<span class="tabular-nums font-medium">{money(b.expense)}</span>
+									</div>
+									<div class="space-y-2">
+										{#each b.expenseSections as section (section.key)}
+											{#if section.txs.length > 0}
+												{@const subkey = `${key}-${section.key}`}
+												<div class="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+													<button
+														class="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
+														onclick={() => toggleExpand(subkey)}
+													>
+														<span class="text-sm font-medium">{section.label}</span>
+														<div class="flex items-center gap-3">
+															<span class="tabular-nums text-sm">{money(section.total)}</span>
+															<span class="text-xs text-slate-400">{isOpen(subkey) ? '−' : '+'}</span>
+														</div>
+													</button>
+													{#if isOpen(subkey)}
+														<ul class="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+															{#each section.txs as t (t.id)}
+																{@const r = renderTxRow(t)}
+																<li class="flex items-center gap-2 px-3 py-1.5 text-xs">
+																	<span class="w-20 shrink-0 text-slate-500">{t.date}</span>
+																	<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+																	<span class="w-28 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+																	<span class="w-20 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
+																</li>
+															{/each}
+														</ul>
+													{/if}
+												</div>
+											{/if}
+										{/each}
+
+										{#if b.otherExpenseTxs.length > 0}
+											{@const subkey = `${key}-other`}
+											<div class="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+												<button
+													class="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
+													onclick={() => toggleExpand(subkey)}
+												>
+													<span class="text-sm font-medium">Other</span>
+													<div class="flex items-center gap-3">
+														<span class="tabular-nums text-sm">{money(sumAbs(b.otherExpenseTxs))}</span>
+														<span class="text-xs text-slate-400">{isOpen(subkey) ? '−' : '+'}</span>
+													</div>
+												</button>
+												{#if isOpen(subkey)}
+													<ul class="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+														{#each b.otherExpenseTxs as t (t.id)}
+															{@const r = renderTxRow(t)}
+															<li class="flex items-center gap-2 px-3 py-1.5 text-xs">
+																<span class="w-20 shrink-0 text-slate-500">{t.date}</span>
+																<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+																<span class="w-28 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+																<span class="w-20 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
+															</li>
+														{/each}
+													</ul>
+												{/if}
+											</div>
+										{/if}
+
+										{#if b.expense === 0}
+											<p class="text-xs text-slate-500">No expense transactions for this business.</p>
+										{/if}
+									</div>
+								</div>
+
 							</div>
 						{/if}
 					</div>
