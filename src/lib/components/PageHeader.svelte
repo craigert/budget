@@ -2,6 +2,7 @@
 	import { theme } from '$lib/theme.svelte';
 	import Icon from './Icon.svelte';
 	import SearchOverlay from './SearchOverlay.svelte';
+	import { base } from '$app/paths';
 
 	interface Props {
 		title: string;
@@ -42,6 +43,26 @@
 	  on wide screens.
 -->
 <header class="px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-5 md:px-8 md:pt-7 md:pb-6">
+	<!--
+		Mobile-only wordmark: the desktop sidebar carries the BudgetSparrow
+		identity, but on mobile the sidebar is replaced by the bottom nav and
+		the bird + name disappear. Drop a small wordmark above the page title
+		so the brand stays anchored at the top of every screen.
+	-->
+	<a
+		href={`${base}/`}
+		class="mb-4 inline-flex items-center gap-2 transition-opacity hover:opacity-80 md:hidden"
+		aria-label="BudgetSparrow home"
+	>
+		<img src={`${base}/logo.png`} alt="" class="h-7 w-auto object-contain shrink-0" />
+		<span
+			class="text-base font-semibold tracking-tight"
+			style="font-family: var(--bs-font-display); color: var(--bs-text); letter-spacing: -0.02em;"
+		>
+			Budget<span style="font-weight: 600; color: var(--bs-accent);">Sparrow</span>
+		</span>
+	</a>
+
 	<div class="flex items-start justify-between gap-3">
 		<div class="min-w-0 flex-1">
 			{#if eyebrow}
