@@ -27,7 +27,14 @@
 <!-- Desktop sidebar (sticky so Settings stays in view) -->
 <aside class="hidden md:sticky md:top-0 md:flex md:h-screen md:w-56 md:flex-col md:self-start md:border-r md:border-slate-200 md:bg-white md:dark:border-slate-800 md:dark:bg-slate-900">
 	<a href={`${base}/`} class="flex flex-col items-center justify-center px-4 pt-6 pb-5 transition-opacity hover:opacity-80" aria-label="Home">
-		<span class="mb-2 text-lg font-bold text-slate-800 dark:text-slate-100">BudgetSparrow</span>
+		<!-- Wordmark per the Claude Design hand-off: "Budget" neutral,
+		     "Sparrow" in the warm mahogany accent to tie text to the bird. -->
+		<span
+			class="mb-2 text-lg font-semibold tracking-tight"
+			style="font-family: var(--bs-font-display); color: var(--bs-text);"
+		>
+			Budget<span style="font-weight: 500; color: var(--bs-accent);">&nbsp;Sparrow</span>
+		</span>
 		<img src={`${base}/logo.png`} alt="BudgetSparrow" class="h-20 w-20 object-contain" />
 	</a>
 	<nav class="flex-1 space-y-1 overflow-y-auto px-3 pb-4">

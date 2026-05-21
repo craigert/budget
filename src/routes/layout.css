@@ -4,22 +4,101 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-	/* Mint-style emerald palette */
-	--color-brand-50: #ecfdf5;
-	--color-brand-100: #d1fae5;
-	--color-brand-200: #a7f3d0;
-	--color-brand-300: #6ee7b7;
-	--color-brand-400: #34d399;
-	--color-brand-500: #00c46a;
-	--color-brand-600: #04a85a;
-	--color-brand-700: #038049;
-	--color-brand-800: #045c36;
-	--color-brand-900: #064e3b;
+	/*
+	 * Brand ramp — derived from the Claude-designed "sparrow jungle" palette.
+	 * The 600 shade is the design's primary brand color (#2F7A3A — deeper,
+	 * more earthy than the previous emerald). Everything from buttons to
+	 * active-nav states to positive deltas reads from this ramp via the
+	 * existing brand-* Tailwind classes, so no page-by-page rewrite is
+	 * needed — the whole app picks up the new green.
+	 */
+	--color-brand-50: #f0f6e9;
+	--color-brand-100: #def0cd;
+	--color-brand-200: #bce0a0;
+	--color-brand-300: #98ce72;
+	--color-brand-400: #6fbf55;
+	--color-brand-500: #42a14e;
+	--color-brand-600: #2f7a3a; /* design primary */
+	--color-brand-700: #265e2d;
+	--color-brand-800: #1d4623;
+	--color-brand-900: #153319;
 
-	/* Surface tokens */
-	--color-surface: #ffffff;
-	--color-surface-muted: #f8fafc;
-	--color-surface-strong: #f1f5f9;
+	/* Surface tokens kept for legacy refs; new code should read --bs-surface. */
+	--color-surface: #fcf8ee;
+	--color-surface-muted: #f5efe0;
+	--color-surface-strong: #ebe0c5;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Design tokens from the Claude Design "Budget Sparrow" handoff.
+   Light + dark variants of the "sparrow jungle" palette. Everything bs-
+   prefixed is a hand-off-defined token; reach for these in new components
+   instead of hard-coded Tailwind slate-*.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+	/* Light — warm sand backdrop, cream cards, jungle green, mahogany accent */
+	--bs-bg: #f5efe0;
+	--bs-surface: #fcf8ee;
+	--bs-surface-2: #ebe0c5;
+	--bs-border: oklch(0.84 0.025 75);
+	--bs-border-2: oklch(0.76 0.035 75);
+	--bs-text: #1a1207;
+	--bs-text-2: #5a4628;
+	--bs-text-3: #9a8865;
+	--bs-brand: #2f7a3a;
+	--bs-brand-2: #42a14e;
+	--bs-brand-soft: oklch(0.91 0.09 142);
+	--bs-brand-tint: oklch(0.95 0.05 142);
+	--bs-accent: #8b5a2b;
+	--bs-accent-2: #b07842;
+	--bs-accent-soft: oklch(0.91 0.07 60);
+	--bs-accent-tint: oklch(0.95 0.045 60);
+	--bs-pos: #2f7a3a;
+	--bs-pos-soft: oklch(0.91 0.09 142);
+	--bs-neg: oklch(0.55 0.18 28);
+	--bs-neg-soft: oklch(0.92 0.05 28);
+	--bs-warn: oklch(0.65 0.16 65);
+
+	/* Density / shape tokens */
+	--bs-radius: 14px;
+	--bs-radius-sm: 10px;
+	--bs-pad-card: 22px;
+	--bs-pad-row: 14px;
+	--bs-gap: 16px;
+	--bs-row-h: 60px;
+	--bs-shadow: 0 1px 0 rgba(15, 23, 42, 0.02), 0 1px 2px rgba(15, 23, 42, 0.04);
+
+	/* Font tokens — Geist is primary, Fraunces is the editorial display face. */
+	--bs-font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--bs-font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
+	--bs-font-serif: 'Fraunces', 'Times New Roman', serif;
+	--bs-font-feat: 'ss01' on, 'cv11' on;
+}
+
+:root.dark {
+	/* Dark — deep moss backdrop, warm cream text, brighter jungle green */
+	--bs-bg: #0f1408;
+	--bs-surface: #181f0d;
+	--bs-surface-2: #13180a;
+	--bs-border: oklch(0.30 0.04 130);
+	--bs-border-2: oklch(0.38 0.05 130);
+	--bs-text: #f1ead3;
+	--bs-text-2: #b8ad8a;
+	--bs-text-3: #7e7253;
+	--bs-brand: #6fbf55;
+	--bs-brand-2: #8fd86e;
+	--bs-brand-soft: oklch(0.30 0.10 142);
+	--bs-brand-tint: oklch(0.22 0.06 142);
+	--bs-accent: #d49560;
+	--bs-accent-2: #e2ac7c;
+	--bs-accent-soft: oklch(0.30 0.08 60);
+	--bs-accent-tint: oklch(0.22 0.05 60);
+	--bs-pos: #6fbf55;
+	--bs-pos-soft: oklch(0.30 0.10 142);
+	--bs-neg: oklch(0.70 0.17 28);
+	--bs-neg-soft: oklch(0.30 0.08 28);
+	--bs-warn: oklch(0.74 0.16 65);
+	--bs-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 html,
@@ -28,12 +107,27 @@ body {
 }
 
 body {
-	@apply bg-slate-50 text-slate-900 antialiased;
-	@apply dark:bg-slate-950 dark:text-slate-100;
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+	background: var(--bs-bg);
+	color: var(--bs-text);
+	font-family: var(--bs-font-sans);
+	font-feature-settings: var(--bs-font-feat);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
 }
 
-/* Form polish */
+/* Reusable surface utility for cards that want the design's cream-on-cream
+   feel (lighter than bg, with a hairline border). Existing cards still using
+   bg-white dark:bg-slate-900 will continue to render white — opt them into
+   .bs-surface as they get touched. */
+.bs-surface {
+	background: var(--bs-surface);
+	border: 0.5px solid var(--bs-border);
+	border-radius: var(--bs-radius);
+	box-shadow: var(--bs-shadow);
+}
+
+/* Form polish — pulls from design tokens so inputs feel native to the theme.
+   Falls back to the previous slate-on-white values via the bs-* defaults. */
 input[type='text'],
 input[type='number'],
 input[type='date'],
@@ -41,29 +135,81 @@ input[type='search'],
 input[type='email'],
 select,
 textarea {
-	@apply rounded-md border-slate-300 bg-white text-slate-900 shadow-sm focus:border-brand-500 focus:ring-brand-500;
-	@apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+	border-color: var(--bs-border);
+	background: var(--bs-surface);
+	color: var(--bs-text);
+	border-radius: var(--bs-radius-sm);
+	box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+}
+input[type='text']:focus,
+input[type='number']:focus,
+input[type='date']:focus,
+input[type='search']:focus,
+input[type='email']:focus,
+select:focus,
+textarea:focus {
+	border-color: var(--bs-brand);
+	box-shadow: 0 0 0 2px color-mix(in oklch, var(--bs-brand) 25%, transparent);
+	outline: none;
 }
 
 button {
-	@apply cursor-pointer;
+	cursor: pointer;
+	font-family: inherit;
 }
 
-/* No-tap-highlight on mobile */
+/* No tap-highlight on mobile (kept from prior). */
 * {
 	-webkit-tap-highlight-color: transparent;
 }
 
+/* Selection follows the brand (matches design's ::selection rule). */
+::selection {
+	background: color-mix(in oklch, var(--bs-brand) 22%, transparent);
+}
+
+/* Scrollbars — slim, themed. */
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+::-webkit-scrollbar-thumb {
+	background: color-mix(in oklch, var(--bs-text-3) 30%, transparent);
+	border-radius: 999px;
+	border: 2px solid transparent;
+	background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: color-mix(in oklch, var(--bs-text-3) 55%, transparent);
+	background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
 /* Mint-style section label */
 .section-label {
-	@apply text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	color: var(--bs-text-3);
 }
 
 /* Highlight flash for search-result deep links */
 @keyframes tx-flash {
-	0%   { background-color: rgb(0 196 106 / 0.0); box-shadow: inset 4px 0 0 0 transparent; }
-	15%  { background-color: rgb(0 196 106 / 0.22); box-shadow: inset 4px 0 0 0 rgb(0 196 106); }
-	100% { background-color: rgb(0 196 106 / 0.0); box-shadow: inset 4px 0 0 0 transparent; }
+	0% {
+		background-color: color-mix(in oklch, var(--bs-brand) 0%, transparent);
+		box-shadow: inset 4px 0 0 0 transparent;
+	}
+	15% {
+		background-color: color-mix(in oklch, var(--bs-brand) 22%, transparent);
+		box-shadow: inset 4px 0 0 0 var(--bs-brand);
+	}
+	100% {
+		background-color: color-mix(in oklch, var(--bs-brand) 0%, transparent);
+		box-shadow: inset 4px 0 0 0 transparent;
+	}
 }
 .tx-flash {
 	animation: tx-flash 2.4s ease-out;
