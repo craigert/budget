@@ -10,7 +10,7 @@
 	} from '$lib/db/queries';
 	import type { Account, Category, Transaction } from '$lib/db/types';
 	import { money, thisMonth, monthLabel, formatDate } from '$lib/utils/format';
-	import { netWorthSeries } from '$lib/utils/netWorthSeries';
+	import { rollingMonthlySeries } from '$lib/utils/netWorthSeries';
 	import { base } from '$app/paths';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Donut from '$lib/components/Donut.svelte';
@@ -44,10 +44,9 @@
 	const allAccounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const allTxs = live<Transaction[]>(() => db.transactions.toArray(), []);
 
-	const currentYear = Number(thisMonth().slice(0, 4));
-	const networthPoints = $derived(
-		netWorthSeries(currentYear, allAccounts.value, allTxs.value, undefined, 'monthly')
-	);
+	// Rolling 12 months of monthly snapshots so the chart's range filter
+	// (1M / 3M / 6M / YTD / 1Y / All) has real data behind every option.
+	const networthPoints = $derived(rollingMonthlySeries(allAccounts.value, allTxs.value, 12));
 
 	const catMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
 	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
@@ -208,7 +207,7 @@
 			style="width: 170px; height: 170px;"
 		>
 			<img
-				src="{base}/logo.png"
+				src="{base}/logo-hero.png"
 				alt=""
 				aria-hidden="true"
 				class="w-full h-full object-contain"

@@ -67,6 +67,71 @@ export function netWorthSeries(
 	return series;
 }
 
+/**
+ * Compute a rolling-N-months net-worth series — one monthly snapshot per
+ * month, ending at today, going back `monthsBack` months. Unlike
+ * `netWorthSeries`, which is bounded to a calendar year, this version gives
+ * the dashboard chart enough history to drive the 1M / 3M / 6M / YTD / 1Y
+ * range filters all from real data.
+ *
+ * Opening cumulative = sum of all account opening balances + every
+ * transaction dated before the rolling window. Each subsequent month adds
+ * that month's transactions in chronological order.
+ */
+export function rollingMonthlySeries(
+	accounts: Account[],
+	transactions: Transaction[],
+	monthsBack: number = 12,
+	today: string = new Date().toISOString().slice(0, 10)
+): NetWorthPoint[] {
+	const [ty, tm] = today.split('-').map(Number);
+	// First day of (today - monthsBack months). Using setUTCMonth so we don't
+	// cross day boundaries when subtracting.
+	const start = new Date(Date.UTC(ty, tm - 1 - monthsBack, 1));
+	const startISO = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}-01`;
+
+	const liveAccounts = accounts.filter((a) => a.archived === 0);
+	let cumulative = liveAccounts.reduce((s, a) => s + a.openingBalance, 0);
+
+	// Apply every transaction dated strictly before the rolling start
+	for (const t of transactions) {
+		if (t.date < startISO) cumulative += t.amount;
+	}
+
+	const inRange = transactions
+		.filter((t) => t.date >= startISO && t.date <= today)
+		.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+	const series: NetWorthPoint[] = [];
+	let txIdx = 0;
+	const cursor = new Date(start);
+
+	// Walk one month at a time until we pass today's month
+	while (true) {
+		const cy = cursor.getUTCFullYear();
+		const cm = cursor.getUTCMonth() + 1;
+		const mm = String(cm).padStart(2, '0');
+		const monthPrefix = `${cy}-${mm}-`;
+
+		while (txIdx < inRange.length && inRange[txIdx].date.startsWith(monthPrefix)) {
+			cumulative += inRange[txIdx].amount;
+			txIdx++;
+		}
+
+		// Snapshot at month-end, but cap at today for the in-progress month
+		const lastDay = new Date(Date.UTC(cy, cm, 0)).getUTCDate();
+		const naturalDate = `${cy}-${mm}-${String(lastDay).padStart(2, '0')}`;
+		const snapshotDate = naturalDate > today ? today : naturalDate;
+		series.push({ date: snapshotDate, value: Math.round(cumulative * 100) / 100 });
+
+		if (cy === ty && cm === tm) break;
+		if (cy > ty || (cy === ty && cm > tm)) break;
+		cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+	}
+
+	return series;
+}
+
 function monthlySnapshots(
 	year: number,
 	openingCumulative: number,

@@ -39,14 +39,20 @@
 >
 	<a
 		href={`${base}/`}
-		class="flex items-center justify-center px-5 pt-6 pb-5 transition-opacity hover:opacity-80"
+		class="flex items-center gap-2.5 px-5 pt-6 pb-6 transition-opacity hover:opacity-80"
 		aria-label="BudgetSparrow"
 	>
 		<img
 			src={`${base}/logo.png`}
-			alt="BudgetSparrow"
-			class="h-12 w-auto object-contain"
+			alt=""
+			class="h-8 w-auto object-contain shrink-0"
 		/>
+		<span
+			class="text-lg font-semibold tracking-tight"
+			style="font-family: var(--bs-font-display); color: var(--bs-text); letter-spacing: -0.02em;"
+		>
+			Budget<span style="font-weight: 600; color: var(--bs-accent);">&nbsp;Sparrow</span>
+		</span>
 	</a>
 	<nav class="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
 		{#each items as item (item.href)}
