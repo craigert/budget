@@ -20,9 +20,47 @@
 	interface Props {
 		points: NetWorthPoint[];
 		anchorAtZero?: boolean;
+		defaultRange?: Range;
 	}
 
-	let { points, anchorAtZero = false }: Props = $props();
+	type Range = '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'All';
+	const RANGES: Range[] = ['1M', '3M', '6M', 'YTD', '1Y', 'All'];
+
+	let { points: rawPoints, anchorAtZero = false, defaultRange = 'All' }: Props = $props();
+
+	let range = $state<Range>(defaultRange);
+
+	// Clamp the input series to the selected window. With the current
+	// year-bounded data source 1Y/All collapse to YTD, but the filter is
+	// future-proofed for when we extend the series beyond a calendar year.
+	const points = $derived.by<NetWorthPoint[]>(() => {
+		if (range === 'All' || rawPoints.length === 0) return rawPoints;
+		const lastIso = rawPoints[rawPoints.length - 1].date;
+		const [ly, lm, ld] = lastIso.split('-').map(Number);
+		const last = new Date(Date.UTC(ly, lm - 1, ld));
+		const cutoff = new Date(last);
+		switch (range) {
+			case '1M':
+				cutoff.setUTCMonth(cutoff.getUTCMonth() - 1);
+				break;
+			case '3M':
+				cutoff.setUTCMonth(cutoff.getUTCMonth() - 3);
+				break;
+			case '6M':
+				cutoff.setUTCMonth(cutoff.getUTCMonth() - 6);
+				break;
+			case 'YTD':
+				cutoff.setUTCMonth(0, 1);
+				break;
+			case '1Y':
+				cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 1);
+				break;
+		}
+		const cutISO = cutoff.toISOString().slice(0, 10);
+		const filtered = rawPoints.filter((p) => p.date >= cutISO);
+		// Keep at least 2 points so we always have a line to draw.
+		return filtered.length >= 2 ? filtered : rawPoints.slice(-2);
+	});
 
 	// Viewport (rendered via viewBox so it scales to the container).
 	// On desktop the chart is a shallow trend strip; on mobile we double the
@@ -158,6 +196,14 @@
 	const start = $derived(points.length > 0 ? points[0].value : 0);
 	const change = $derived(latest - start);
 	const changePct = $derived(start !== 0 ? (change / Math.abs(start)) * 100 : 0);
+	const sinceLabel = $derived.by(() => {
+		if (points.length === 0) return '';
+		const [y, m, d] = points[0].date.split('-').map(Number);
+		return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+			month: 'short',
+			day: 'numeric'
+		});
+	});
 
 	// Animation
 	let mounted = $state(false);
@@ -219,24 +265,47 @@
 {:else}
 	<div class="space-y-3">
 		<!-- Summary header -->
-		<div class="flex items-end justify-between gap-4">
+		<div class="flex flex-wrap items-start justify-between gap-3">
 			<div>
 				<div class="text-4xl font-bold tabular-nums tracking-tight {latest < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'}">
 					{money(latest)}
 				</div>
-				<div class="mt-1 flex items-center gap-2 text-sm">
+				<div class="mt-1 flex flex-wrap items-center gap-2 text-sm">
 					<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {change >= 0 ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'}">
 						{change >= 0 ? '↑' : '↓'} {money(Math.abs(change))} ({changePct >= 0 ? '+' : ''}{changePct.toFixed(1)}%)
 					</span>
-					<span class="text-slate-500">since Jan 1</span>
+					<span class="text-slate-500">since {sinceLabel}</span>
 				</div>
 			</div>
-			{#if extremes}
-				<div class="hidden sm:flex flex-col items-end gap-0.5 text-right text-xs text-slate-500">
-					<div>High: <span class="font-medium tabular-nums text-slate-700 dark:text-slate-300">{money(extremes.high.point.value)}</span> · {fmtDate(extremes.high.point.date)}</div>
-					<div>Low: <span class="font-medium tabular-nums text-slate-700 dark:text-slate-300">{money(extremes.low.point.value)}</span> · {fmtDate(extremes.low.point.date)}</div>
+			<div class="flex flex-col items-end gap-1">
+				<!-- Range filter -->
+				<div
+					role="tablist"
+					aria-label="Time range"
+					class="inline-flex overflow-hidden rounded-md border border-slate-200 bg-slate-50 text-[11px] font-medium dark:border-slate-700 dark:bg-slate-800"
+				>
+					{#each RANGES as r (r)}
+						<button
+							type="button"
+							role="tab"
+							aria-selected={range === r}
+							onclick={() => (range = r)}
+							class="px-2.5 py-1 tabular-nums transition-colors {range === r
+								? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+								: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}"
+						>
+							{r}
+						</button>
+					{/each}
 				</div>
-			{/if}
+				{#if extremes}
+					<div class="hidden sm:block text-right text-[11px] text-slate-500 tabular-nums">
+						High <span class="font-medium text-slate-700 dark:text-slate-300">{money(extremes.high.point.value)}</span>
+						·
+						Low <span class="font-medium text-slate-700 dark:text-slate-300">{money(extremes.low.point.value)}</span>
+					</div>
+				{/if}
+			</div>
 		</div>
 
 		<div class="relative" bind:this={containerEl}>
