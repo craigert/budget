@@ -25,15 +25,29 @@
 	let { points, anchorAtZero = false }: Props = $props();
 
 	// Viewport (rendered via viewBox so it scales to the container).
-	// Half-height aspect — wide and shallow for a trend strip.
+	// On desktop the chart is a shallow trend strip; on mobile we double the
+	// viewBox height so the chart isn't scrunched into ~50px of vertical room.
 	const W = 1600;
-	const H = 250;
-	const padL = 96; // tight gutter sized for the current font-size 13 labels
+	const padL = 96;
 	const padR = 40;
 	const padT = 22;
 	const padB = 40;
 	const innerW = W - padL - padR;
-	const innerH = H - padT - padB;
+
+	let isMobile = $state(false);
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		const mq = window.matchMedia('(max-width: 640px)');
+		isMobile = mq.matches;
+		const listener = (e: MediaQueryListEvent) => (isMobile = e.matches);
+		mq.addEventListener('change', listener);
+		return () => mq.removeEventListener('change', listener);
+	});
+	const H = $derived(isMobile ? 500 : 250);
+	const innerH = $derived(H - padT - padB);
+	const dotRadius = $derived(isMobile ? 14 : 7);
+	const dotRadiusLatest = $derived(isMobile ? 18 : 10);
+	const dotStrokeWidth = $derived(isMobile ? 6 : 4);
 
 	const yDomain = $derived.by(() => {
 		if (points.length === 0) return { min: 0, max: 1 };
@@ -263,11 +277,11 @@
 				<circle
 					cx={x(i)}
 					cy={y(p.value)}
-					r={isLatest ? 10 : 7}
+					r={isLatest ? dotRadiusLatest : dotRadius}
 					fill="white"
 					stroke="currentColor"
 					class="text-brand-500"
-					stroke-width="4"
+					stroke-width={dotStrokeWidth}
 					style="opacity:{mounted ? 1 : 0}; transition: opacity 0.35s ease-out {0.4 + (i / Math.max(1, points.length)) * 0.7}s;"
 				/>
 			{/each}
@@ -287,11 +301,11 @@
 				<circle
 					cx={x(hoverIdx)}
 					cy={y(hoverPoint.value)}
-					r="11"
+					r={isMobile ? 20 : 11}
 					fill="white"
 					stroke="currentColor"
 					class="text-brand-500"
-					stroke-width="4"
+					stroke-width={dotStrokeWidth}
 				/>
 			{/if}
 		</svg>

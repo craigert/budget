@@ -38,6 +38,36 @@
 	let pageSize = $state(50);
 	let visibleCount = $state(50);
 
+	// ?highlight=<txId>: scroll into view + flash a highlight class
+	let highlightId = $state<number | null>(null);
+	$effect(() => {
+		const raw = page.url.searchParams.get('highlight');
+		const id = raw ? Number(raw) : null;
+		if (!id || Number.isNaN(id)) return;
+		highlightId = id;
+	});
+	// Whenever the highlight target appears in the rendered list, scroll + flash.
+	$effect(() => {
+		if (highlightId == null) return;
+		const inList = shown.some((t) => t.id === highlightId);
+		if (!inList) {
+			// Bump visibleCount until the row is shown, or give up if not in filtered set.
+			const idx = filtered.findIndex((t) => t.id === highlightId);
+			if (idx >= 0 && idx >= visibleCount) visibleCount = idx + 25;
+			return;
+		}
+		// Defer to next frame so the row has been laid out
+		requestAnimationFrame(() => {
+			const el = document.querySelector<HTMLElement>(`[data-tx-id="${highlightId}"]`);
+			if (!el) return;
+			el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			el.classList.add('tx-flash');
+			setTimeout(() => el.classList.remove('tx-flash'), 2400);
+			// Clear so we don't re-fire on later effects
+			highlightId = null;
+		});
+	});
+
 	const filtered = $derived.by(() => {
 		const qq = q.trim().toLowerCase();
 		return txs.value.filter((t) => {
@@ -194,7 +224,7 @@
 			{#each shown as t (t.id)}
 				{@const cat = t.categoryId != null ? categoryMap.get(t.categoryId) : null}
 				{@const acct = accountMap.get(t.accountId)}
-				<li class="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
+				<li data-tx-id={t.id} class="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
 					<div
 						class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
 						style="background:{cat?.color ?? '#94a3b8'}22;color:{cat?.color ?? '#475569'}"

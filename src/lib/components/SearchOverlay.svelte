@@ -76,8 +76,10 @@
 	});
 
 	function selectResult(t: Transaction) {
-		const q = encodeURIComponent(t.payee || '');
-		const url = `${base}/transactions${q ? `?q=${q}` : ''}`;
+		const params = new URLSearchParams();
+		if (t.payee) params.set('q', t.payee);
+		if (t.id != null) params.set('highlight', String(t.id));
+		const url = `${base}/transactions?${params.toString()}`;
 		goto(url);
 		onclose();
 	}

@@ -23,6 +23,9 @@
 
 	const sum = $derived(total ?? slices.reduce((s, x) => s + x.value, 0));
 
+	// Total sweep time for the entire ring's circumferential draw
+	const SWEEP_SEC = 1.2;
+
 	const segments = $derived.by(() => {
 		if (!sum) return [];
 		let acc = 0;
@@ -32,8 +35,12 @@
 				const frac = s.value / sum;
 				const dasharray = `${frac * c} ${c}`;
 				const dashoffset = -acc * c;
+				// Each segment starts when its arc begins and runs proportional to its size
+				// — so the ring fills clockwise, segment by segment.
+				const delay = acc * SWEEP_SEC;
+				const duration = Math.max(0.12, frac * SWEEP_SEC);
 				acc += frac;
-				return { ...s, dasharray, dashoffset, pct: frac * 100 };
+				return { ...s, dasharray, dashoffset, pct: frac * 100, delay, duration };
 			});
 	});
 
@@ -53,7 +60,8 @@
 <div class="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-8">
 	<svg
 		viewBox="0 0 {size} {size}"
-		class="block h-72 w-72 shrink-0 -rotate-90 sm:h-80 sm:w-80"
+		class="block aspect-square shrink-0 -rotate-90"
+		style="width: clamp(14rem, 28vw, 22rem);"
 		role="img"
 		aria-label="Donut chart"
 	>
@@ -68,7 +76,7 @@
 			stroke-width={stroke}
 		/>
 
-		<!-- Animated segments: each grows from 0 stroke-length to its target -->
+		<!-- Animated segments: each fills its own arc in turn, clockwise -->
 		{#each segments as seg, i (seg.label)}
 			<circle
 				cx={size / 2}
@@ -80,7 +88,7 @@
 				stroke-dasharray={mounted ? seg.dasharray : `0 ${c}`}
 				stroke-dashoffset={seg.dashoffset}
 				stroke-linecap="butt"
-				style="transition: stroke-dasharray 0.7s cubic-bezier(0.22, 1, 0.36, 1) {i * 0.06}s, stroke-dashoffset 0.5s cubic-bezier(0.22, 1, 0.36, 1);"
+				style="transition: stroke-dasharray {seg.duration}s linear {seg.delay}s;"
 			/>
 		{/each}
 
@@ -125,7 +133,7 @@
 		{#each segments as seg, i (seg.label)}
 			<li
 				class="flex items-center gap-2"
-				style="opacity:{mounted ? 1 : 0}; transform: translateX({mounted ? '0' : '-4px'}); transition: opacity 0.4s ease-out {0.3 + i * 0.05}s, transform 0.4s ease-out {0.3 + i * 0.05}s;"
+				style="opacity:{mounted ? 1 : 0}; transform: translateX({mounted ? '0' : '-4px'}); transition: opacity 0.4s ease-out {seg.delay + 0.1}s, transform 0.4s ease-out {seg.delay + 0.1}s;"
 			>
 				<span class="h-2.5 w-2.5 shrink-0 rounded-sm" style="background:{seg.color}"></span>
 				{#if seg.icon}
