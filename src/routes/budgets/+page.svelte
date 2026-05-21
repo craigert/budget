@@ -2,7 +2,7 @@
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
 	import type { Budget, Category, CategoryKind } from '$lib/db/types';
-	import { spendingByCategory } from '$lib/db/queries';
+	import { spendingByCategory, incomingByCategory } from '$lib/db/queries';
 	import { money, thisMonth, addMonths, monthLabel } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -16,6 +16,10 @@
 	const budgets = live<Budget[]>(() => db.budgets.where('month').equals(month).toArray(), []);
 	const spending = live<{ categoryId: number | null; total: number }[]>(
 		() => spendingByCategory(month),
+		[]
+	);
+	const incomeReceived = live<{ categoryId: number | null; total: number }[]>(
+		() => incomingByCategory(month),
 		[]
 	);
 
@@ -33,6 +37,7 @@
 
 	const budgetMap = $derived(new Map(budgets.value.map((b) => [b.categoryId, b])));
 	const spendMap = $derived(new Map(spending.value.map((s) => [s.categoryId, s.total])));
+	const incomeMap = $derived(new Map(incomeReceived.value.map((i) => [i.categoryId, i.total])));
 
 	async function setAmount(categoryId: number, amount: number) {
 		const cleaned = Math.max(0, Number(amount) || 0);
@@ -275,8 +280,8 @@
 								<div class="shrink-0 tabular-nums text-slate-600 dark:text-slate-400">
 									{money(spent)} <span class="text-slate-400">/</span> {money(budgeted)}
 								</div>
-								<div class="w-24 shrink-0 text-right tabular-nums {remaining < 0 ? 'text-red-600' : 'text-slate-500'}">
-									{money(remaining)}
+								<div class="w-24 shrink-0 text-right tabular-nums {remaining < 0 ? 'font-medium text-red-600' : 'text-slate-500'}">
+									{remaining < 0 ? `Over ${money(-remaining)}` : money(remaining)}
 								</div>
 							</div>
 						{:else if spent > 0}
@@ -304,6 +309,7 @@
 		{:else}
 			<ul class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
 				{#each income as c (c.id)}
+					{@const received = incomeMap.get(c.id!) ?? 0}
 					<li class="group flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
 						<div class="flex h-9 w-9 items-center justify-center rounded-full" style="background:{c.color}22;color:{c.color}">
 							<Icon name={c.icon} size={20} />
@@ -312,6 +318,10 @@
 						{#if c.tempMonth != null}
 							<span class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Temporary — won't copy to other months">One-time income</span>
 						{/if}
+						<div class="shrink-0 text-right">
+							<div class="tabular-nums font-medium {received > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}">{money(received)}</div>
+							<div class="text-[10px] text-slate-400">received</div>
+						</div>
 						<div class="flex shrink-0 gap-1 opacity-60 transition-opacity group-hover:opacity-100">
 							<button
 								class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"

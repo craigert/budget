@@ -55,6 +55,23 @@ export async function spendingByCategory(month: string): Promise<MonthSpending[]
 		.sort((a, b) => b.total - a.total);
 }
 
+export async function incomingByCategory(month: string): Promise<MonthSpending[]> {
+	const map = new Map<number | null, number>();
+	const start = `${month}-01`;
+	const end = `${month}-32`;
+	await db.transactions
+		.where('date')
+		.between(start, end, true, true)
+		.each((t) => {
+			if (t.amount > 0) {
+				map.set(t.categoryId, (map.get(t.categoryId) ?? 0) + t.amount);
+			}
+		});
+	return Array.from(map.entries())
+		.map(([categoryId, total]) => ({ categoryId, total }))
+		.sort((a, b) => b.total - a.total);
+}
+
 export async function incomeForMonth(month: string): Promise<number> {
 	let total = 0;
 	const start = `${month}-01`;
