@@ -6,9 +6,10 @@
 	interface Props {
 		title: string;
 		subtitle?: string;
+		subtitleContent?: import('svelte').Snippet;
 		actions?: import('svelte').Snippet;
 	}
-	let { title, subtitle, actions }: Props = $props();
+	let { title, subtitle, subtitleContent, actions }: Props = $props();
 
 	let showSearch = $state(false);
 
@@ -32,7 +33,9 @@
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<div>
 			<h1 class="text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>
-			{#if subtitle}
+			{#if subtitleContent}
+				{@render subtitleContent()}
+			{:else if subtitle}
 				<p class="mt-0.5 text-sm text-white/85">{subtitle}</p>
 			{/if}
 		</div>

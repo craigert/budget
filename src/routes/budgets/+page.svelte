@@ -94,33 +94,28 @@
 		pendingChange = null;
 	}
 
-	async function copyPrevious() {
-		const prev = addMonths(month, -1);
-		const prevBudgets = await db.budgets.where('month').equals(prev).toArray();
-		if (!prevBudgets.length) {
-			alert('No budgets in the previous month to copy.');
-			return;
-		}
-		// Build a set of one-time category IDs so we can skip them
-		const allCats = await db.categories.toArray();
-		const oneTimeCatIds = new Set(allCats.filter((c) => c.tempMonth != null).map((c) => c.id!));
+	// Auto-carry budgets from the previous month when navigating to a month with none
+	$effect(() => {
+		const m = month; // tracked as reactive dependency
+		(async () => {
+			const existing = await db.budgets.where('month').equals(m).count();
+			if (existing > 0) return; // already has budgets, nothing to do
 
-		await db.transaction('rw', db.budgets, async () => {
-			for (const b of prevBudgets) {
-				// Never carry one-time categories into another month
-				if (oneTimeCatIds.has(b.categoryId)) continue;
-				const existing = await db.budgets
-					.where(['categoryId', 'month'])
-					.equals([b.categoryId, month])
-					.first();
-				if (existing?.id) {
-					await db.budgets.update(existing.id, { amount: b.amount });
-				} else {
-					await db.budgets.add({ categoryId: b.categoryId, month, amount: b.amount });
+			const prev = addMonths(m, -1);
+			const prevBudgets = await db.budgets.where('month').equals(prev).toArray();
+			if (!prevBudgets.length) return; // nothing to copy from
+
+			const allCats = await db.categories.toArray();
+			const oneTimeCatIds = new Set(allCats.filter((c) => c.tempMonth != null).map((c) => c.id!));
+
+			await db.transaction('rw', db.budgets, async () => {
+				for (const b of prevBudgets) {
+					if (oneTimeCatIds.has(b.categoryId)) continue;
+					await db.budgets.add({ categoryId: b.categoryId, month: m, amount: b.amount });
 				}
-			}
-		});
-	}
+			});
+		})();
+	});
 
 	async function archiveCategory(c: Category) {
 		if (!c.id) return;
@@ -162,12 +157,30 @@
 	}
 </script>
 
-<PageHeader title="Budgets" subtitle={monthLabel(month)}>
-	{#snippet actions()}
-		<Button variant="onbrand" size="sm" onclick={() => (month = addMonths(month, -1))}>←</Button>
-		<Button variant="onbrand" size="sm" onclick={() => (month = thisMonth())}>Today</Button>
-		<Button variant="onbrand" size="sm" onclick={() => (month = addMonths(month, 1))}>→</Button>
-		<Button variant="onbrand" size="sm" onclick={copyPrevious}>Copy last month</Button>
+<PageHeader title="Budgets">
+	{#snippet subtitleContent()}
+		{@const isToday = month === thisMonth()}
+		<div class="mt-1 flex items-center gap-0.5">
+			<button
+				type="button"
+				onclick={() => (month = addMonths(month, -1))}
+				class="rounded px-1.5 py-0.5 text-base leading-none text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+				aria-label="Previous month"
+			>‹</button>
+			<button
+				type="button"
+				onclick={() => (month = thisMonth())}
+				class="rounded px-1.5 py-0.5 text-sm font-medium transition-colors {isToday ? 'cursor-default text-white/80' : 'text-white hover:bg-white/10'}"
+				aria-label="Go to current month"
+				title={isToday ? '' : 'Jump to today'}
+			>{monthLabel(month)}</button>
+			<button
+				type="button"
+				onclick={() => (month = addMonths(month, 1))}
+				class="rounded px-1.5 py-0.5 text-base leading-none text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+				aria-label="Next month"
+			>›</button>
+		</div>
 	{/snippet}
 </PageHeader>
 
