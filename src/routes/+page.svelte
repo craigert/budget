@@ -360,33 +360,6 @@
 		</section>
 	</div>
 
-	<!-- Accounts strip -->
-	{#if accounts.value.length > 0}
-		<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="mb-3 flex items-center justify-between">
-				<h2 class="text-base font-semibold" style="color: var(--bs-text);">Accounts</h2>
-				<a
-					href="{base}/accounts"
-					class="text-sm transition-opacity hover:opacity-80"
-					style="color: var(--bs-brand);"
-				>
-					Manage →
-				</a>
-			</div>
-			<ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-				{#each accounts.value as a (a.id)}
-					{@const bal = balances.value.get(a.id!) ?? a.openingBalance}
-					<li
-						class="flex items-center justify-between rounded-lg px-3 py-2"
-						style="border: 0.5px solid var(--bs-border);"
-					>
-						<span class="truncate text-sm" style="color: var(--bs-text);">{a.name}</span>
-						<span class="shrink-0 text-sm font-medium tabular-nums" style="color: {bal < 0 ? 'var(--bs-neg)' : 'var(--bs-text)'};">{money(bal)}</span>
-					</li>
-				{/each}
-			</ul>
-		</section>
-	{/if}
 </div>
 
 <style>
