@@ -14,13 +14,17 @@ export default defineConfig({
 			base: '/',
 			manifest: {
 				name: 'BudgetSparrow',
-				short_name: 'Budget',
+				short_name: 'BudgetSparrow',
 				description:
 					'Local-first personal budgeting PWA — accounts, transactions, budgets, goals, taxes, and receipt OCR.',
 				lang: 'en',
 				categories: ['finance', 'productivity'],
+				// theme_color controls the Android nav-bar tint while the app is
+				// open; background_color is the splash backdrop iOS / Chromium
+				// show before the first paint. Kept on-brand: dark chrome but
+				// white splash, matching the sparrow artwork.
 				theme_color: '#0f172a',
-				background_color: '#0f172a',
+				background_color: '#ffffff',
 				display: 'standalone',
 				orientation: 'any',
 				start_url: '/',

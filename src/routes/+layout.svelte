@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-	<title>Budget</title>
+	<title>BudgetSparrow</title>
 	<!-- theme-color is set per-color-scheme in app.html. -->
 </svelte:head>
 
