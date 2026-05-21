@@ -41,7 +41,6 @@
 		trackingMode: 'account' as GoalTrackingMode,
 		accountIds: new Set<number>(),
 		categoryId: null as number | null,
-		baselineAmount: 0,
 		notes: ''
 	});
 	$effect(() => {
@@ -57,7 +56,6 @@
 					trackingMode: editing.trackingMode,
 					accountIds: new Set(editing.accountIds),
 					categoryId: editing.categoryId,
-					baselineAmount: editing.baselineAmount,
 					notes: editing.notes
 				};
 			} else {
@@ -71,7 +69,6 @@
 					trackingMode: 'account',
 					accountIds: new Set<number>(),
 					categoryId: null,
-					baselineAmount: 0,
 					notes: ''
 				};
 			}
@@ -98,7 +95,7 @@
 			trackingMode: form.trackingMode,
 			accountIds: form.trackingMode === 'account' ? [...form.accountIds] : [],
 			categoryId: form.trackingMode === 'category' ? form.categoryId : null,
-			baselineAmount: Number(form.baselineAmount) || 0,
+			baselineAmount: 0,
 			notes: form.notes.trim()
 		};
 		let id: number;
@@ -199,7 +196,7 @@
 						{/each}
 					</div>
 					<p class="mt-1 text-xs text-slate-500">
-						Progress = combined balance of the checked accounts (minus the baseline below).
+						Progress = combined balance of the checked accounts.
 					</p>
 				{/if}
 			</div>
@@ -218,19 +215,9 @@
 			</div>
 		{/if}
 
-		<div class="grid grid-cols-2 gap-3">
-			<div>
-				<label for="g-start" class="mb-1 block text-sm font-medium">Start date</label>
-				<input id="g-start" type="date" bind:value={form.startDate} class="w-full" />
-			</div>
-			<div>
-				<label for="g-baseline" class="mb-1 block text-sm font-medium">Baseline (offset)</label>
-				<div class="relative">
-					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
-					<input id="g-baseline" type="number" inputmode="decimal" step="0.01" bind:value={form.baselineAmount} use:clearOnFocus class="w-full pl-6" />
-				</div>
-				<p class="mt-0.5 text-[10px] text-slate-500">Subtracted from progress so an account that already has money doesn't show as 100% complete.</p>
-			</div>
+		<div>
+			<label for="g-start" class="mb-1 block text-sm font-medium">Start date</label>
+			<input id="g-start" type="date" bind:value={form.startDate} class="w-full" />
 		</div>
 
 		<div>
