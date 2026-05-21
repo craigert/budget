@@ -9,11 +9,9 @@
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
+	import { base } from '$app/paths';
 
-	const accounts = live<Account[]>(
-		() => db.accounts.orderBy('createdAt').toArray(),
-		[]
-	);
+	const accounts = live<Account[]>(() => db.accounts.orderBy('createdAt').toArray(), []);
 	const balances = live<Map<number, number>>(() => accountBalances(), new Map());
 
 	let showModal = $state(false);
@@ -77,105 +75,220 @@
 	const visible = $derived(accounts.value.filter((a) => a.archived === 0));
 	const archived = $derived(accounts.value.filter((a) => a.archived === 1));
 	const typeLabel = (t: AccountType) => ACCOUNT_TYPES.find((x) => x.value === t)?.label ?? t;
-
-	// Group accounts by purpose for the dashboard layout
-	type Group = { key: string; label: string; types: AccountType[] };
-	const GROUPS: Group[] = [
-		{ key: 'banking', label: 'Banking', types: ['checking', 'savings', 'cash'] },
-		{ key: 'credit', label: 'Credit & Loans', types: ['credit', 'loan'] },
-		{ key: 'investments', label: 'Investments', types: ['investment'] },
-		{ key: 'other', label: 'Other', types: ['other'] }
-	];
-
 	function balanceOf(a: Account): number {
 		return balances.value.get(a.id!) ?? a.openingBalance;
 	}
 
-	const groupedAccounts = $derived(
-		GROUPS.map((g) => ({
-			...g,
-			accounts: visible.filter((a) => g.types.includes(a.type))
-		})).filter((g) => g.accounts.length > 0)
+	// Group accounts into the design's four sections: Cash / Investments / Credit cards / Loans.
+	type Section = {
+		key: string;
+		label: string;
+		types: AccountType[];
+		mode: 'asset' | 'liability';
+	};
+	const SECTIONS: Section[] = [
+		{ key: 'cash', label: 'Cash', types: ['checking', 'savings', 'cash'], mode: 'asset' },
+		{ key: 'investments', label: 'Investments', types: ['investment'], mode: 'asset' },
+		{ key: 'credit', label: 'Credit cards', types: ['credit'], mode: 'liability' },
+		{ key: 'loans', label: 'Loans', types: ['loan'], mode: 'liability' },
+		{ key: 'other', label: 'Other', types: ['other'], mode: 'asset' }
+	];
+
+	const sections = $derived(
+		SECTIONS.map((s) => ({
+			...s,
+			accounts: visible.filter((a) => s.types.includes(a.type))
+		})).filter((s) => s.accounts.length > 0)
 	);
 
-	const groupSubtotals = $derived(
-		new Map(groupedAccounts.map((g) => [g.key, g.accounts.reduce((s, a) => s + balanceOf(a), 0)]))
+	const assets = $derived(
+		visible
+			.filter((a) => !['credit', 'loan'].includes(a.type))
+			.reduce((s, a) => s + balanceOf(a), 0)
 	);
-	const netWorth = $derived(visible.reduce((s, a) => s + balanceOf(a), 0));
+	const liabilities = $derived(
+		visible
+			.filter((a) => ['credit', 'loan'].includes(a.type))
+			.reduce((s, a) => s + Math.abs(balanceOf(a)), 0)
+	);
+	const netWorth = $derived(assets - liabilities);
+
+	// Section subtotals — assets are positive, liabilities negative for the display.
+	function sectionTotal(s: { accounts: Account[]; mode: 'asset' | 'liability' }): number {
+		const sum = s.accounts.reduce((acc, a) => acc + balanceOf(a), 0);
+		return s.mode === 'liability' ? -Math.abs(sum) : sum;
+	}
 </script>
 
-<PageHeader title="Accounts" subtitle="Your balances are calculated from transactions.">
+<PageHeader title="Accounts" eyebrow="NET WORTH VIEW">
 	{#snippet actions()}
-		<Button variant="onbrand" onclick={openCreate}>+ Account</Button>
+		<a
+			href="{base}/transactions"
+			class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+			style="background: var(--bs-text); color: var(--bs-bg);"
+		>
+			<Icon name="general/plus" size={14} />
+			Add transaction
+		</a>
 	{/snippet}
 </PageHeader>
 
 <div class="space-y-6 p-4 md:p-8">
 	{#if visible.length === 0}
-		<div class="rounded-lg border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700">
-			No accounts yet. Add one to start tracking.
+		<div
+			class="rounded-xl p-10 text-center"
+			style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);"
+		>
+			<p style="color: var(--bs-text-2);">No accounts yet. Add one to start tracking.</p>
+			<div class="mt-4">
+				<Button onclick={openCreate}>+ Add account</Button>
+			</div>
 		</div>
 	{:else}
-		<!-- Net worth summary -->
-		<div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-			<div class="section-label">Net worth</div>
-			<div class="mt-1 text-3xl font-bold tabular-nums {netWorth < 0 ? 'text-red-600' : ''}">{money(netWorth)}</div>
-			<div class="mt-1 text-xs text-slate-500">{visible.length} active account{visible.length === 1 ? '' : 's'}</div>
+		<!-- KPI row: Assets / Liabilities / Net worth -->
+		<div class="grid gap-4 sm:grid-cols-3">
+			<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+				<div class="mb-3.5 flex items-center justify-between">
+					<span class="section-label">Assets</span>
+					<span class="h-2 w-2 rounded-full" style="background: var(--bs-pos); opacity: 0.7;"></span>
+				</div>
+				<div class="bs-kpi">{money(assets)}</div>
+			</div>
+			<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+				<div class="mb-3.5 flex items-center justify-between">
+					<span class="section-label">Liabilities</span>
+					<span class="h-2 w-2 rounded-full" style="background: var(--bs-neg); opacity: 0.7;"></span>
+				</div>
+				<div class="bs-kpi">{money(liabilities)}</div>
+			</div>
+			<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+				<div class="mb-3.5 flex items-center justify-between">
+					<span class="section-label">Net worth</span>
+				</div>
+				<div class="bs-kpi" style="color: {netWorth < 0 ? 'var(--bs-neg)' : 'var(--bs-text)'};">
+					{money(netWorth)}
+				</div>
+			</div>
 		</div>
 
-		{#each groupedAccounts as g (g.key)}
-			<section>
-				<div class="mb-3 flex items-baseline justify-between">
-					<h2 class="text-lg font-semibold">{g.label}</h2>
-					<div class="text-sm text-slate-500">
-						{g.accounts.length} account{g.accounts.length === 1 ? '' : 's'} ·
-						<span class="font-medium tabular-nums {(groupSubtotals.get(g.key) ?? 0) < 0 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}">{money(groupSubtotals.get(g.key) ?? 0)}</span>
-					</div>
+		<!-- Sections -->
+		{#each sections as s (s.key)}
+			{@const total = sectionTotal(s)}
+			<section
+				class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+				style="padding: 0;"
+			>
+				<div
+					class="flex items-baseline justify-between"
+					style="padding: 16px var(--bs-pad-card);"
+				>
+					<h2 class="text-base font-semibold" style="color: var(--bs-text);">{s.label}</h2>
+					<span
+						class="bs-mono"
+						style="font-size: 13.5px; font-weight: 500; color: {total < 0 ? 'var(--bs-neg)' : 'var(--bs-text)'};"
+					>
+						{money(total)}
+					</span>
 				</div>
-				<ul class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-					{#each g.accounts as a (a.id)}
-						<li class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-							<div class="flex items-start justify-between">
-								<div>
-									<div class="text-sm text-slate-500">{typeLabel(a.type)}</div>
-									<div class="text-lg font-semibold">{a.name}</div>
+				<ul style="border-top: 0.5px solid var(--bs-border);">
+					{#each s.accounts as a (a.id)}
+						{@const bal = balanceOf(a)}
+						{@const displayBal = s.mode === 'liability' ? -Math.abs(bal) : bal}
+						<li
+							class="group flex items-center gap-3"
+							style="padding: 14px var(--bs-pad-card); border-bottom: 0.5px solid var(--bs-border);"
+						>
+							<div
+								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+								style="background: var(--bs-surface-2); color: var(--bs-text-2); border: 0.5px solid var(--bs-border);"
+							>
+								<Icon name="finance-ecommerce/wallet" size={16} />
+							</div>
+							<div class="min-w-0 flex-1">
+								<div
+									class="truncate text-sm font-medium"
+									style="color: var(--bs-text); font-size: 13.5px;"
+								>
+									{a.name}
 								</div>
-								<div class="flex gap-1">
-									<button
-										class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-										onclick={() => openEdit(a)}
-										aria-label="Edit"
-									>
-										<Icon name="general/edit-01" size={16} />
-									</button>
-									<button
-										class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-										onclick={() => archiveAccount(a)}
-										aria-label="Archive"
-									>
-										<Icon name="general/archive" size={16} />
-									</button>
+								<div
+									class="truncate text-xs"
+									style="color: var(--bs-text-3); font-size: 11.5px;"
+								>
+									{typeLabel(a.type)}
 								</div>
 							</div>
-							<div class="mt-3 text-2xl font-semibold tabular-nums {balanceOf(a) < 0 ? 'text-red-600' : ''}">
-								{money(balanceOf(a))}
+							<div
+								class="bs-mono shrink-0 text-right"
+								style="font-size: 13.5px; font-weight: 500; color: {displayBal < 0 ? 'var(--bs-neg)' : 'var(--bs-text)'};"
+							>
+								{money(displayBal)}
+							</div>
+							<div class="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+								<button
+									class="rounded-md p-1.5"
+									style="color: var(--bs-text-3);"
+									onclick={() => openEdit(a)}
+									aria-label="Edit"
+								>
+									<Icon name="general/edit-01" size={14} />
+								</button>
+								<button
+									class="rounded-md p-1.5"
+									style="color: var(--bs-text-3);"
+									onclick={() => archiveAccount(a)}
+									aria-label="Archive"
+								>
+									<Icon name="general/archive" size={14} />
+								</button>
 							</div>
 						</li>
 					{/each}
 				</ul>
 			</section>
 		{/each}
+
+		<!-- Connect another account card -->
+		<section
+			class="rounded-xl flex flex-col items-center text-center"
+			style="border: 1px dashed var(--bs-border-2); background: transparent; padding: 32px;"
+		>
+			<div
+				class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg"
+				style="background: var(--bs-surface-2); color: var(--bs-text-2); border: 0.5px solid var(--bs-border);"
+			>
+				<Icon name="general/link-01" size={18} />
+			</div>
+			<div class="text-sm font-medium" style="color: var(--bs-text);">Connect another account</div>
+			<div class="mt-1 text-xs" style="color: var(--bs-text-3);">
+				Add manually — bank linking is coming soon.
+			</div>
+			<button
+				type="button"
+				onclick={openCreate}
+				class="mt-4 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+				style="background: var(--bs-text); color: var(--bs-bg);"
+			>
+				<Icon name="general/plus" size={14} />
+				Add account
+			</button>
+		</section>
 	{/if}
 
 	{#if archived.length}
-		<details class="mt-8">
-			<summary class="cursor-pointer text-sm text-slate-500">Archived ({archived.length})</summary>
+		<details class="mt-2">
+			<summary class="cursor-pointer text-sm" style="color: var(--bs-text-3);">
+				Archived ({archived.length})
+			</summary>
 			<ul class="mt-3 space-y-2">
 				{#each archived as a (a.id)}
-					<li class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+					<li
+						class="flex items-center justify-between rounded-md bg-white px-4 py-2 text-sm dark:bg-slate-900"
+						style="border: 0.5px solid var(--bs-border);"
+					>
 						<div>
-							<span class="font-medium">{a.name}</span>
-							<span class="ml-2 text-slate-500">{typeLabel(a.type)}</span>
+							<span class="font-medium" style="color: var(--bs-text-2);">{a.name}</span>
+							<span class="ml-2" style="color: var(--bs-text-3);">{typeLabel(a.type)}</span>
 						</div>
 						<Button size="sm" variant="secondary" onclick={() => unarchive(a)}>Restore</Button>
 					</li>
@@ -204,7 +317,15 @@
 				<label for="opening" class="mb-1 block text-sm font-medium">Opening balance</label>
 				<div class="relative">
 					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
-					<input id="opening" type="number" inputmode="decimal" step="0.01" bind:value={form.openingBalance} use:clearOnFocus class="w-full pl-6" />
+					<input
+						id="opening"
+						type="number"
+						inputmode="decimal"
+						step="0.01"
+						bind:value={form.openingBalance}
+						use:clearOnFocus
+						class="w-full pl-6"
+					/>
 				</div>
 			</div>
 		</div>

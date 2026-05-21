@@ -3,12 +3,11 @@
 	import { live } from '$lib/db/live.svelte';
 	import type { Account, Category, Goal, GoalContribution, Transaction } from '$lib/db/types';
 	import { goalCurrent, goalProgress } from '$lib/db/goals';
-	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 	import { money } from '$lib/utils/format';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import GoalFormModal from '$lib/components/GoalFormModal.svelte';
+	import { base } from '$app/paths';
 
 	const goals = live<Goal[]>(
 		() =>
@@ -29,14 +28,6 @@
 
 	const categoryMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
 	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
-	const contributionsByGoal = $derived.by(() => {
-		const map = new Map<number, GoalContribution[]>();
-		for (const c of contributions.value) {
-			if (!map.has(c.goalId)) map.set(c.goalId, []);
-			map.get(c.goalId)!.push(c);
-		}
-		return map;
-	});
 
 	let currents = $state<Map<number, number>>(new Map());
 	$effect(() => {
@@ -57,41 +48,6 @@
 		})();
 	});
 
-	// Manual contribution form
-	let showContribFor = $state<number | null>(null); // goalId
-	let contribForm = $state({ date: '', amount: 0, notes: '' });
-
-	function openContribForm(goalId: number) {
-		showContribFor = goalId;
-		contribForm = { date: new Date().toISOString().slice(0, 10), amount: 0, notes: '' };
-	}
-
-	async function saveContrib(goalId: number) {
-		if (!(contribForm.amount > 0)) return;
-		await db.goalContributions.add({
-			goalId,
-			date: contribForm.date,
-			amount: Number(contribForm.amount),
-			notes: contribForm.notes.trim(),
-			createdAt: Date.now()
-		} as GoalContribution);
-		showContribFor = null;
-	}
-
-	async function deleteContrib(id: number) {
-		await db.goalContributions.delete(id);
-	}
-
-	const totals = $derived.by(() => {
-		let saved = 0;
-		let target = 0;
-		for (const g of goals.value) {
-			target += g.targetAmount;
-			saved += currents.get(g.id!) ?? 0;
-		}
-		return { saved, target };
-	});
-
 	let showModal = $state(false);
 	let editing = $state<Goal | null>(null);
 	function openCreate() {
@@ -103,40 +59,10 @@
 		showModal = true;
 	}
 
-	function formatDate(iso: string | null): string {
-		if (!iso) return 'No deadline';
+	function formatTargetDate(iso: string | null): string {
+		if (!iso) return 'No target';
 		const [y, m, d] = iso.split('-').map(Number);
-		return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		});
-	}
-
-	function paceLabel(pace: ReturnType<typeof goalProgress>['pace']) {
-		switch (pace) {
-			case 'complete':
-				return { label: '✓ Reached', cls: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200' };
-			case 'ahead':
-				return { label: 'Ahead', cls: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200' };
-			case 'on-track':
-				return { label: 'On track', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' };
-			case 'behind':
-				return { label: 'Behind', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200' };
-			case 'overdue':
-				return { label: 'Overdue', cls: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' };
-			case 'no-deadline':
-			default:
-				return { label: 'No deadline', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' };
-		}
-	}
-
-	function barColor(p: ReturnType<typeof goalProgress>): string {
-		if (p.complete) return 'bg-brand-500';
-		if (p.pace === 'overdue') return 'bg-red-500';
-		if (p.pace === 'behind') return 'bg-amber-500';
-		if (p.pace === 'ahead') return 'bg-brand-500';
-		return 'bg-emerald-500';
+		return `Target by ${new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
 	}
 
 	function linkedAccountsLabel(g: Goal): string {
@@ -149,222 +75,140 @@
 	}
 </script>
 
-<PageHeader title="Goals" subtitle="Track savings toward what matters">
+<PageHeader title="Goals" eyebrow="SAVINGS PROGRESS">
 	{#snippet actions()}
-		<Button variant="onbrand" size="sm" onclick={openCreate}>+ New goal</Button>
+		<a
+			href="{base}/transactions"
+			class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+			style="background: var(--bs-text); color: var(--bs-bg);"
+		>
+			<Icon name="general/plus" size={14} />
+			Add transaction
+		</a>
 	{/snippet}
 </PageHeader>
 
-<div class="space-y-6 p-4 md:p-8">
+<div class="p-4 md:p-8">
 	{#if goals.value.length === 0}
-		<div class="rounded-lg border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
-			<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/15">
+		<div
+			class="rounded-xl p-10 text-center"
+			style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);"
+		>
+			<div
+				class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full"
+				style="background: var(--bs-brand-tint); color: var(--bs-brand);"
+			>
 				<Icon name="finance-ecommerce/piggy-bank" size={28} />
 			</div>
-			<h2 class="text-lg font-semibold">Set your first goal</h2>
-			<p class="mt-1 text-sm text-slate-500">
-				Examples: Emergency Fund · Down Payment · Boat · Swimming Pool · Warhammer Figurines · Lego Sets
+			<h2 class="text-lg font-semibold" style="color: var(--bs-text);">Set your first goal</h2>
+			<p class="mt-1 text-sm" style="color: var(--bs-text-2);">
+				Emergency Fund · Down Payment · Vacation · Anything you're saving toward.
 			</p>
 			<div class="mt-4">
-				<Button onclick={openCreate}>+ New goal</Button>
+				<button
+					type="button"
+					onclick={openCreate}
+					class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+					style="background: var(--bs-text); color: var(--bs-bg);"
+				>
+					<Icon name="general/plus" size={14} />
+					New goal
+				</button>
 			</div>
 		</div>
 	{:else}
-		<!-- Total summary -->
-		<div class="grid gap-3 sm:grid-cols-3">
-			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-				<div class="section-label">Total saved</div>
-				<div class="mt-1 text-2xl font-bold tabular-nums text-brand-500">{money(totals.saved)}</div>
-			</div>
-			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-				<div class="section-label">Total target</div>
-				<div class="mt-1 text-2xl font-bold tabular-nums">{money(totals.target)}</div>
-			</div>
-			<div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-				<div class="section-label">{goals.value.length} active goal{goals.value.length === 1 ? '' : 's'}</div>
-				<div class="mt-1 text-2xl font-bold tabular-nums {totals.target > 0 ? '' : 'text-slate-400'}">
-					{totals.target > 0 ? `${Math.round((totals.saved / totals.target) * 100)}%` : '—'}
-				</div>
-			</div>
-		</div>
-
-		<!-- Goal cards -->
-		<ul class="grid gap-4 md:grid-cols-2">
+		<!--
+			Goal grid per design — 4-col on wide screens with a dashed "+ New goal"
+			tile at the end so the call-to-action lives in-grid (matches mockup).
+		-->
+		<ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 			{#each goals.value as g (g.id)}
 				{@const current = currents.get(g.id!) ?? 0}
 				{@const p = goalProgress(g, current)}
-				{@const pl = paceLabel(p.pace)}
 				{@const pct = Math.min(100, Math.max(0, p.percent))}
-				<li class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div class="flex items-start gap-3">
-						<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style="background:{g.color}22;color:{g.color}">
-							<Icon name={g.icon} size={22} />
-						</div>
-						<div class="min-w-0 flex-1">
-							<div class="flex items-baseline justify-between gap-2">
-								<h3 class="truncate text-lg font-semibold">{g.name}</h3>
-								<span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {pl.cls}">{pl.label}</span>
+				<li>
+					<button
+						type="button"
+						onclick={() => openEdit(g)}
+						class="w-full text-left rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 transition-shadow hover:shadow-md"
+						title={g.notes || `${g.name} — click to edit`}
+					>
+						<div class="flex items-start gap-3">
+							<div
+								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+								style="background: color-mix(in oklch, {g.color} 14%, var(--bs-surface)); color: {g.color}; border: 0.5px solid color-mix(in oklch, {g.color} 28%, transparent);"
+							>
+								<Icon name={g.icon} size={18} />
 							</div>
-							<div class="mt-0.5 truncate text-xs text-slate-500">
-								{#if g.trackingMode === 'account'}
-									{linkedAccountsLabel(g)}
-								{:else if g.trackingMode === 'category'}
-									{categoryMap.get(g.categoryId ?? -1)?.name ?? 'Unlinked category'} contributions
-								{:else}
-									Manual contributions
-								{/if}
-							</div>
-						</div>
-						<button
-							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-							onclick={() => openEdit(g)}
-							aria-label="Edit"
-						>
-							<Icon name="general/edit-01" size={16} />
-						</button>
-					</div>
-
-					<!-- Big numbers -->
-					<div class="mt-4 flex items-baseline justify-between gap-2">
-						<div>
-							<div class="text-3xl font-bold tabular-nums">{money(current)}</div>
-							<div class="text-sm text-slate-500">of {money(g.targetAmount)}</div>
-						</div>
-						<div class="text-right">
-							<div class="text-2xl font-bold tabular-nums {p.complete ? 'text-brand-500' : ''}">{Math.round(p.percent)}%</div>
-							{#if p.complete}
-								<div class="text-xs text-brand-600">Goal reached!</div>
-							{:else}
-								<div class="text-xs text-slate-500">{money(p.remaining)} to go</div>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Progress bar with on-pace marker -->
-					<div class="mt-3">
-						<div class="relative h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-							<div class="h-full transition-all {barColor(p)}" style="width:{pct}%"></div>
-							{#if p.expectedPercent != null && !p.complete}
+							<div class="min-w-0 flex-1">
 								<div
-									class="absolute top-0 h-full w-0.5 bg-slate-900/60 dark:bg-white/70"
-									style="left:{p.expectedPercent}%"
-									title="On-pace marker"
-								></div>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Linked accounts chips (when 2+) -->
-					{#if g.trackingMode === 'account' && g.accountIds.length > 1}
-						<div class="mt-3 flex flex-wrap gap-1.5">
-							{#each g.accountIds as id (id)}
-								{@const a = accountMap.get(id)}
-								{#if a}
-									<span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-										<Icon name="finance-ecommerce/wallet" size={11} />
-										{a.name}
-									</span>
-								{/if}
-							{/each}
-						</div>
-					{/if}
-
-					<!-- Footer info -->
-					<div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-						<div>
-							{#if g.deadline}
-								<span class="font-medium">{formatDate(g.deadline)}</span>
-								{#if p.daysLeft != null}
-									· <span>{p.daysLeft >= 0 ? `${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left` : `${-p.daysLeft} day${p.daysLeft === -1 ? '' : 's'} past`}</span>
-								{/if}
-							{:else}
-								<span>No deadline</span>
-							{/if}
-						</div>
-						{#if p.projectedCompletion && !p.complete}
-							<div>
-								Projected at current pace: <span class="font-medium">{formatDate(p.projectedCompletion)}</span>
-							</div>
-						{/if}
-					</div>
-
-					{#if g.notes}
-						<p class="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
-							{g.notes}
-						</p>
-					{/if}
-
-					{#if g.trackingMode === 'manual'}
-						{@const goalContribs = contributionsByGoal.get(g.id!) ?? []}
-						<div class="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-							{#if goalContribs.length > 0}
-								<ul class="mb-2 divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-									{#each goalContribs.slice(0, 5) as c (c.id)}
-										<li class="flex items-center gap-2 px-3 py-1.5 text-xs">
-											<span class="w-20 shrink-0 text-slate-500">{c.date}</span>
-											<span class="flex-1 truncate text-slate-500">{c.notes || '—'}</span>
-											<span class="shrink-0 font-medium tabular-nums text-emerald-600 dark:text-emerald-400">+{money(c.amount)}</span>
-											<button
-												class="shrink-0 text-slate-300 hover:text-red-500"
-												onclick={() => deleteContrib(c.id!)}
-												aria-label="Delete contribution"
-											>×</button>
-										</li>
-									{/each}
-									{#if goalContribs.length > 5}
-										<li class="px-3 py-1.5 text-center text-xs text-slate-400">{goalContribs.length - 5} more…</li>
-									{/if}
-								</ul>
-							{/if}
-
-							{#if showContribFor === g.id}
-								<div class="rounded-lg border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-500/30 dark:bg-brand-500/10">
-									<div class="mb-2 flex gap-2">
-										<input
-											type="date"
-											bind:value={contribForm.date}
-											class="w-36 shrink-0 text-sm"
-										/>
-										<div class="relative flex-1">
-											<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
-											<input
-												type="number"
-												step="0.01"
-												min="0"
-												bind:value={contribForm.amount}
-												use:clearOnFocus
-												placeholder="Amount"
-												class="w-full pl-6 text-sm"
-											/>
-										</div>
-									</div>
-									<input
-										type="text"
-										bind:value={contribForm.notes}
-										placeholder="Notes (optional)"
-										class="mb-2 w-full text-sm"
-									/>
-									<div class="flex gap-2">
-										<button
-											class="flex-1 rounded-md bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
-											onclick={() => saveContrib(g.id!)}
-										>Save</button>
-										<button
-											class="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-											onclick={() => (showContribFor = null)}
-										>Cancel</button>
-									</div>
+									class="truncate text-sm font-medium"
+									style="color: var(--bs-text); font-size: 13.5px;"
+								>
+									{g.name}
 								</div>
-							{:else}
-								<button
-									class="w-full rounded-md border border-dashed border-slate-300 py-1.5 text-xs text-slate-500 hover:border-brand-400 hover:text-brand-600 dark:border-slate-700 dark:hover:border-brand-500"
-									onclick={() => openContribForm(g.id!)}
-								>+ Log contribution</button>
-							{/if}
+								<div class="truncate text-xs" style="color: var(--bs-text-3); font-size: 11.5px;">
+									{formatTargetDate(g.deadline)}
+								</div>
+							</div>
+							<span
+								class="bs-mono"
+								style="font-size: 12px; color: var(--bs-text-2); white-space: nowrap;"
+							>
+								{Math.round(p.percent)}%
+							</span>
 						</div>
-					{/if}
+
+						<div class="mt-3 flex items-baseline gap-1.5">
+							<span class="bs-kpi" style="font-size: 24px;">{money(current)}</span>
+							<span class="bs-mono" style="font-size: 12px; color: var(--bs-text-3);">
+								/ {money(g.targetAmount)}
+							</span>
+						</div>
+
+						<div
+							class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full"
+							style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);"
+						>
+							<div
+								class="h-full transition-all"
+								style="width: {pct}%; background: {p.complete ? 'var(--bs-pos)' : 'var(--bs-brand)'};"
+							></div>
+						</div>
+
+						<div class="mt-3 flex items-center justify-between">
+							<span class="bs-mono" style="font-size: 11.5px; color: var(--bs-text-3);">
+								{p.complete ? 'Reached' : `${money(p.remaining)} to go`}
+							</span>
+							<span
+								class="inline-flex items-center gap-1 rounded-full"
+								style="padding: 4px 9px; font-size: 11px; font-weight: 500; border: 0.5px solid var(--bs-border); background: var(--bs-surface); color: var(--bs-text-2);"
+							>
+								<Icon name="general/plus" size={11} />
+								Contribute
+							</span>
+						</div>
+					</button>
 				</li>
 			{/each}
+			<!-- Dashed "+ New goal" placeholder -->
+			<li>
+				<button
+					type="button"
+					onclick={openCreate}
+					class="w-full flex h-full min-h-[180px] flex-col items-center justify-center rounded-xl transition-colors"
+					style="border: 1px dashed var(--bs-border-2); background: transparent; color: var(--bs-text-2);"
+				>
+					<div
+						class="mb-2 flex h-9 w-9 items-center justify-center rounded-lg"
+						style="background: var(--bs-surface-2); color: var(--bs-text-2); border: 0.5px solid var(--bs-border);"
+					>
+						<Icon name="general/plus" size={18} />
+					</div>
+					<div class="text-sm font-medium" style="color: var(--bs-text);">New goal</div>
+					<div class="mt-0.5 text-xs" style="color: var(--bs-text-3);">Save for what matters</div>
+				</button>
+			</li>
 		</ul>
 	{/if}
 </div>
