@@ -12,5 +12,20 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  // Plaintext runtime variables. These are checked into the public repo,
+  // so DO NOT put anything sensitive here. They are the source of truth
+  // for the Worker on every `wrangler deploy` — dashboard-added plaintext
+  // vars get wiped on the next CI deploy.
+  //
+  // Secrets live separately (Cloudflare dashboard → Secrets, or
+  // `wrangler secret put`). Deploys never touch them. The two we keep
+  // as Secrets:
+  //   AZURE_DOC_INTEL_ENDPOINT  (URL embeds the resource name — treat as private)
+  //   AZURE_DOC_INTEL_KEY       (subscription key)
+  "vars": {
+    "AZURE_DOC_INTEL_MODEL": "prebuilt-receipt",
+    "AZURE_DOC_INTEL_API_VERSION": "2024-11-30",
+    "ALLOWED_ORIGINS": "https://budget-sparrow.budgeting.workers.dev"
+  }
 }
