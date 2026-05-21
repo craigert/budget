@@ -137,41 +137,49 @@
 
 <div class="space-y-6 p-4 md:p-8">
 	<!--
-		Greeting hero card. Soft brand→accent gradient backdrop with the
-		sparrow illustration anchored on the right — the "you walked into
-		the room" moment from the chat hand-off.
+		Greeting hero. Per the design's screen-home.jsx:
+		- Backdrop: 120° linear-gradient(brand-soft → accent-soft) — uses the
+		  pre-mixed soft variants from the palette, NOT a runtime color-mix.
+		- Eyebrow: 11px / 600 / 0.10em tracking / brand color (NOT text-3).
+		- Title: 34px / 500 / -0.03em on desktop, 26px on mobile. Name is
+		  italic Geist colored with --bs-brand.
+		- Body: 14px text-2 with --bs-pos colored mono money inline.
+		- Sparrow logo on the right: 170px desktop, drop-shadow filter.
 	-->
 	<section
-		class="bs-hero relative overflow-hidden rounded-[var(--bs-radius)] border p-6 md:p-8"
-		style="border-color: var(--bs-border);"
+		class="bs-hero relative overflow-hidden flex flex-wrap items-center gap-6"
+		style="border: 0.5px solid var(--bs-border); border-radius: var(--bs-radius); padding: 20px 18px; box-shadow: var(--bs-shadow);"
 	>
-		<div class="relative z-10 max-w-2xl">
+		<div class="relative z-[1] flex-1 min-w-[240px]">
 			<div
-				class="mb-3 text-[11px] font-medium uppercase tracking-[0.14em]"
-				style="color: var(--bs-text-2);"
+				class="mb-1.5"
+				style="font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: var(--bs-brand);"
 			>
 				{dayLabel}
 			</div>
 			<h2
-				class="text-3xl font-semibold md:text-4xl"
-				style="font-family: var(--bs-font-display); color: var(--bs-text); letter-spacing: -0.025em;"
+				class="m-0"
+				style="font-family: var(--bs-font-display); font-size: 26px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.05; color: var(--bs-text);"
 			>
-				{greeting}{#if displayName.value}, <span style="font-family: var(--bs-font-serif); font-style: italic; font-weight: 400;">{displayName.value}</span>.{:else}!{/if}
+				{greeting}{#if displayName.value}, <span style="color: var(--bs-brand); font-style: italic; font-family: var(--bs-font-serif); font-weight: 400;">{displayName.value}</span>.{:else}!{/if}
 			</h2>
-			<p class="mt-2 text-sm md:text-[15px]" style="color: var(--bs-text-2);">
+			<p
+				class="mt-2.5 max-w-[520px]"
+				style="font-size: 13px; line-height: 1.5; letter-spacing: -0.005em; color: var(--bs-text-2);"
+			>
 				{#if inc.value > 0}
 					{#if projectedSavings >= 0}
 						You're on pace to save
-						<span class="font-semibold" style="color: var(--bs-pos);">{money(projectedSavings)}</span>
+						<span class="bs-mono" style="color: var(--bs-pos); font-weight: 600;">{money(projectedSavings)}</span>
 						this month
 						{#if Math.abs(paceDelta) > 1 && prevSaved !== 0}
-							— {paceDelta >= 0 ? `${paceDelta.toFixed(0)}% ahead` : `${Math.abs(paceDelta).toFixed(0)}% behind`} of {monthLabel(prevMonth)}.
+							— <span style="color: var(--bs-text);">{paceDelta >= 0 ? `${paceDelta.toFixed(0)}% ahead` : `${Math.abs(paceDelta).toFixed(0)}% behind`}</span> of {monthLabel(prevMonth)}.
 						{:else}
 							.
 						{/if}
 					{:else}
 						You're trending
-						<span class="font-semibold" style="color: var(--bs-neg);">{money(Math.abs(projectedSavings))} short</span>
+						<span class="bs-mono" style="color: var(--bs-neg); font-weight: 600;">{money(Math.abs(projectedSavings))} short</span>
 						this month — time to revisit the budget.
 					{/if}
 				{:else}
@@ -180,41 +188,53 @@
 			</p>
 			<div class="mt-4 flex flex-wrap gap-2">
 				<span
-					class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-					style="background: color-mix(in oklch, var(--bs-pos) 18%, transparent); color: var(--bs-pos);"
+					class="inline-flex items-center gap-1.5 rounded-full"
+					style="padding: 5px 10px; background: color-mix(in oklch, var(--bs-pos) 14%, transparent); color: var(--bs-pos); font-size: 11.5px; font-weight: 500;"
 				>
 					<Icon name="charts/trend-up" size={12} />
 					{savingsRate >= 10 ? 'Strong savings rate' : 'Building savings'}
 				</span>
 				<span
-					class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-					style="background: color-mix(in oklch, var(--bs-accent) 18%, transparent); color: var(--bs-accent);"
+					class="inline-flex items-center gap-1.5 rounded-full"
+					style="padding: 5px 10px; background: color-mix(in oklch, var(--bs-accent) 12%, transparent); color: var(--bs-accent); font-size: 11.5px; font-weight: 500;"
 				>
 					<Icon name="general/target-04" size={12} />
 					{accounts.value.length} account{accounts.value.length === 1 ? '' : 's'} tracked
 				</span>
 			</div>
 		</div>
-		<img
-			src="{base}/logo.png"
-			alt=""
-			aria-hidden="true"
-			class="pointer-events-none absolute -right-2 -bottom-2 hidden h-40 w-40 object-contain opacity-95 md:right-6 md:bottom-2 md:block md:h-44 md:w-44"
-		/>
+		<div
+			class="relative shrink-0 hidden md:flex items-center justify-center"
+			style="width: 170px; height: 170px;"
+		>
+			<img
+				src="{base}/logo.png"
+				alt=""
+				aria-hidden="true"
+				class="w-full h-full object-contain"
+				style="filter: drop-shadow(0 6px 16px rgba(40, 30, 12, 0.18));"
+			/>
+		</div>
 	</section>
 
-	<!-- KPI tiles -->
-	<div class="grid gap-3 sm:grid-cols-3">
-		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="section-label">Income</div>
-			<div class="mt-1.5 text-3xl font-bold tabular-nums" style="color: var(--bs-pos);">
-				{money(inc.value)}
+	<!--
+		KPI tiles per design/components.jsx Stat:
+		- 11px / 500 / 0.04em uppercase section label (via .section-label)
+		- 30px / 500 value with -0.025em tracking (via .bs-kpi)
+		- delta tag: tonal background at 12-14% color-mix, 12px text, tabular-nums
+	-->
+	<div class="grid gap-4 sm:grid-cols-3">
+		<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+			<div class="mb-3.5 flex items-center justify-between">
+				<span class="section-label">Income</span>
+				<span class="h-2 w-2 rounded-full" style="background: var(--bs-pos); opacity: 0.7;"></span>
 			</div>
+			<div class="bs-kpi" style="color: var(--bs-pos);">{money(inc.value)}</div>
 			{#if incPrev.value > 0}
-				<div class="mt-2 flex items-center gap-2 text-xs">
+				<div class="mt-2.5 flex items-center gap-2" style="font-size: 12px;">
 					<span
-						class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium tabular-nums"
-						style="background: color-mix(in oklch, {incDelta >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'} 14%, transparent); color: {incDelta >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'};"
+						class="bs-tag bs-mono"
+						style="background: color-mix(in oklch, {incDelta >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'} 12%, transparent); color: {incDelta >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'};"
 					>
 						{incDelta >= 0 ? '↑' : '↓'} {money(Math.abs(incDelta))}
 					</span>
@@ -222,16 +242,17 @@
 				</div>
 			{/if}
 		</div>
-		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="section-label">Spending</div>
-			<div class="mt-1.5 text-3xl font-bold tabular-nums" style="color: var(--bs-text);">
-				{money(exp.value)}
+		<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+			<div class="mb-3.5 flex items-center justify-between">
+				<span class="section-label">Spending</span>
+				<span class="h-2 w-2 rounded-full" style="background: var(--bs-neg); opacity: 0.7;"></span>
 			</div>
+			<div class="bs-kpi">{money(exp.value)}</div>
 			{#if expPrev.value > 0}
-				<div class="mt-2 flex items-center gap-2 text-xs">
+				<div class="mt-2.5 flex items-center gap-2" style="font-size: 12px;">
 					<span
-						class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium tabular-nums"
-						style="background: color-mix(in oklch, {expDelta <= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'} 14%, transparent); color: {expDelta <= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'};"
+						class="bs-tag bs-mono"
+						style="background: color-mix(in oklch, {expDelta <= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'} 12%, transparent); color: {expDelta <= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'};"
 					>
 						{expDelta <= 0 ? '↓' : '↑'} {money(Math.abs(expDelta))}
 					</span>
@@ -239,25 +260,22 @@
 				</div>
 			{/if}
 		</div>
-		<div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="flex items-baseline justify-between gap-2">
-				<div class="section-label">Health score</div>
+		<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+			<div class="mb-3.5 flex items-center justify-between">
+				<span class="section-label">Health score</span>
 				<span
-					class="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-					style="background: color-mix(in oklch, var(--bs-pos) 18%, transparent); color: var(--bs-pos);"
+					class="bs-tag"
+					style="background: color-mix(in oklch, var(--bs-pos) 12%, transparent); color: var(--bs-pos);"
 				>
 					{healthLabel}
 				</span>
 			</div>
-			<div class="mt-1.5 flex items-baseline gap-1">
-				<span class="text-3xl font-bold tabular-nums" style="color: var(--bs-text);">
-					{healthScore}
-				</span>
-				<span class="text-sm" style="color: var(--bs-text-3);">/100</span>
+			<div class="flex items-baseline gap-2">
+				<span class="bs-kpi">{healthScore}</span>
+				<span class="bs-mono" style="font-size: 14px; color: var(--bs-text-3);">/100</span>
 			</div>
-			<!-- Slim progress bar in brand color -->
 			<div
-				class="mt-3 h-1.5 w-full overflow-hidden rounded-full"
+				class="mt-3 h-1 w-full overflow-hidden rounded-full"
 				style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);"
 			>
 				<div
@@ -265,9 +283,9 @@
 					style="width: {Math.max(2, Math.min(100, healthScore))}%; background: var(--bs-pos);"
 				></div>
 			</div>
-			<div class="mt-2 text-xs" style="color: var(--bs-text-2);">
+			<div class="mt-2.5" style="font-size: 12px; color: var(--bs-text-2);">
 				{#if inc.value > 0}
-					{savedThisMonth >= 0 ? 'Saved' : 'Overspent'} <span class="font-medium tabular-nums">{money(Math.abs(savedThisMonth))}</span> this month
+					{savedThisMonth >= 0 ? 'Saved' : 'Overspent'} <span class="bs-mono" style="color: var(--bs-text);">{money(Math.abs(savedThisMonth))}</span> this month
 				{:else}
 					Log some income to see your savings rate
 				{/if}

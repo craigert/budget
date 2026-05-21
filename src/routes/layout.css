@@ -68,9 +68,11 @@
 	--bs-row-h: 60px;
 	--bs-shadow: 0 1px 0 rgba(15, 23, 42, 0.02), 0 1px 2px rgba(15, 23, 42, 0.04);
 
-	/* Font tokens — Geist is primary, Fraunces is the editorial display face. */
+	/* Font tokens. Geist is primary, Geist Mono is used for tabular numbers
+	   (amounts, deltas), Fraunces is the editorial italic accent. */
 	--bs-font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 	--bs-font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
+	--bs-font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 	--bs-font-serif: 'Fraunces', 'Times New Roman', serif;
 	--bs-font-feat: 'ss01' on, 'cv11' on;
 }
@@ -143,7 +145,11 @@ body {
 	background: var(--bs-surface);
 	border-color: var(--bs-border);
 	border-width: 0.5px;
+	border-radius: var(--bs-radius);
 	box-shadow: var(--bs-shadow);
+	/* p-5 across pages → 20px; design wants 22px. Forced here so every card
+	   gets the design's exact card padding without per-page edits. */
+	padding: var(--bs-pad-card);
 }
 .dark .rounded-xl.dark\:border-slate-800.dark\:bg-slate-900,
 .dark .rounded-lg.dark\:border-slate-800.dark\:bg-slate-900,
@@ -151,6 +157,7 @@ body {
 	background: var(--bs-surface);
 	border-color: var(--bs-border);
 	border-width: 0.5px;
+	border-radius: var(--bs-radius);
 	box-shadow: var(--bs-shadow);
 }
 
@@ -215,13 +222,62 @@ button {
 	background: transparent;
 }
 
-/* Mint-style section label */
+/*
+ * Design tokens, lifted verbatim from components.jsx (Claude Design hand-off).
+ * These are the precise visual primitives used across every card.
+ */
+
+/* Card section label — uppercase eyebrow above a KPI value or card title. */
 .section-label {
-	font-size: 10px;
-	font-weight: 600;
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.04em;
 	text-transform: uppercase;
-	letter-spacing: 0.12em;
 	color: var(--bs-text-3);
+	font-family: var(--bs-font-sans);
+}
+
+/* KPI value (big number). 30px / 500 / tight tracking / display font.
+   The design intentionally uses weight 500 — bold/700 reads heavier than
+   intended and breaks the airy feel. */
+.bs-kpi {
+	font-family: var(--bs-font-display);
+	font-size: 30px;
+	font-weight: 500;
+	letter-spacing: -0.025em;
+	line-height: 1.05;
+	font-variant-numeric: tabular-nums;
+	color: var(--bs-text);
+}
+
+/* Hero / big-number variant for the net-worth display. */
+.bs-display {
+	font-family: var(--bs-font-display);
+	font-size: 42px;
+	font-weight: 500;
+	letter-spacing: -0.03em;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+	color: var(--bs-text);
+}
+
+/* Monospace numeric (deltas, range buttons, $ figures). */
+.bs-mono {
+	font-family: var(--bs-font-mono);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Tag pill — the "Excellent" / "↑ $10K" badges. Background is a 12% color-mix
+   of the token color, foreground is the token. */
+.bs-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 7px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
 }
 
 /* Highlight flash for search-result deep links */

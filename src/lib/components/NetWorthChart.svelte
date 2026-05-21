@@ -264,25 +264,36 @@
 	</div>
 {:else}
 	<div class="space-y-3">
-		<!-- Summary header -->
-		<div class="flex flex-wrap items-start justify-between gap-3">
+		<!-- Summary header — design/screen-home.jsx exact spec -->
+		<div class="mb-3.5 flex flex-wrap items-start justify-between gap-4">
 			<div>
-				<div class="text-4xl font-bold tabular-nums tracking-tight {latest < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'}">
+				<div class="section-label" style="letter-spacing: 0.06em;">
+					Net worth · {new Date().getFullYear()}
+				</div>
+				<div
+					class="bs-display mt-1.5"
+					style="color: {latest < 0 ? 'var(--bs-neg)' : 'var(--bs-text)'};"
+				>
 					{money(latest)}
 				</div>
-				<div class="mt-1 flex flex-wrap items-center gap-2 text-sm">
-					<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {change >= 0 ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'}">
+				<div class="mt-2.5 flex flex-wrap items-center gap-2.5" style="font-size: 12.5px;">
+					<span
+						class="bs-tag bs-mono"
+						style="background: color-mix(in oklch, {change >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'} 12%, transparent); color: {change >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'};"
+					>
 						{change >= 0 ? '↑' : '↓'} {money(Math.abs(change))} ({changePct >= 0 ? '+' : ''}{changePct.toFixed(1)}%)
 					</span>
-					<span class="text-slate-500">since {sinceLabel}</span>
+					<span style="color: var(--bs-text-2);">since {sinceLabel}</span>
 				</div>
 			</div>
-			<div class="flex flex-col items-end gap-1">
-				<!-- Range filter -->
+			<div class="flex flex-col items-end gap-1.5">
+				<!-- Range filter — inset toggle: surface-2 bg, active state lifts to
+				     surface with a faint inner shadow. Mono numerals throughout. -->
 				<div
 					role="tablist"
 					aria-label="Time range"
-					class="inline-flex overflow-hidden rounded-md border border-slate-200 bg-slate-50 text-[11px] font-medium dark:border-slate-700 dark:bg-slate-800"
+					class="inline-flex gap-0.5 bs-mono"
+					style="padding: 2px; border: 0.5px solid var(--bs-border); border-radius: var(--bs-radius-sm); background: var(--bs-surface-2);"
 				>
 					{#each RANGES as r (r)}
 						<button
@@ -290,19 +301,17 @@
 							role="tab"
 							aria-selected={range === r}
 							onclick={() => (range = r)}
-							class="px-2.5 py-1 tabular-nums transition-colors {range === r
-								? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-								: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}"
+							style="padding: 4px 8px; font-size: 11.5px; font-weight: 500; border: 0; border-radius: calc(var(--bs-radius-sm) - 2px); cursor: pointer; transition: background-color 0.12s ease, color 0.12s ease; background: {range === r ? 'var(--bs-surface)' : 'transparent'}; color: {range === r ? 'var(--bs-text)' : 'var(--bs-text-3)'}; box-shadow: {range === r ? '0 1px 1px rgba(15,23,42,.05)' : 'none'};"
 						>
 							{r}
 						</button>
 					{/each}
 				</div>
 				{#if extremes}
-					<div class="hidden sm:block text-right text-[11px] text-slate-500 tabular-nums">
-						High <span class="font-medium text-slate-700 dark:text-slate-300">{money(extremes.high.point.value)}</span>
+					<div class="hidden sm:block bs-mono" style="font-size: 11px; color: var(--bs-text-3);">
+						High <span style="color: var(--bs-text-2);">{money(extremes.high.point.value)}</span>
 						·
-						Low <span class="font-medium text-slate-700 dark:text-slate-300">{money(extremes.low.point.value)}</span>
+						Low <span style="color: var(--bs-text-2);">{money(extremes.low.point.value)}</span>
 					</div>
 				{/if}
 			</div>
