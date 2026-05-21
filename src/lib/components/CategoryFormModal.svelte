@@ -123,7 +123,7 @@
 		{#if !editing && forMonth}
 			<div>
 				<label for="cat-budget" class="mb-1 block text-sm font-medium">
-					Budget for {monthLabel(forMonth)} <span class="font-normal text-slate-400">(optional)</span>
+					Budget for {monthLabel(forMonth)}
 				</label>
 				<div class="relative">
 					<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
