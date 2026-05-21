@@ -2,10 +2,10 @@
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
 	import type { Account, Category, Goal, GoalTrackingMode } from '$lib/db/types';
-	import { ICON_GROUPS } from '$lib/icons';
 	import Modal from './Modal.svelte';
 	import Button from './Button.svelte';
 	import Icon from './Icon.svelte';
+	import IconPicker from './IconPicker.svelte';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	interface Props {
@@ -44,8 +44,6 @@
 		baselineAmount: 0,
 		notes: ''
 	});
-	let iconQuery = $state('');
-
 	$effect(() => {
 		if (open) {
 			if (editing) {
@@ -77,23 +75,8 @@
 					notes: ''
 				};
 			}
-			iconQuery = '';
 		}
 	});
-
-	const filteredGroups = $derived.by(() => {
-		const q = iconQuery.trim().toLowerCase();
-		if (!q) return ICON_GROUPS;
-		return ICON_GROUPS.map((g) => ({
-			label: g.label,
-			icons: g.icons.filter((p) => p.toLowerCase().includes(q))
-		})).filter((g) => g.icons.length > 0);
-	});
-
-	function iconLabel(p: string) {
-		const name = p.split('/').pop() ?? p;
-		return name.replace(/-\d+$/, '').replace(/-/g, ' ');
-	}
 
 	function toggleAccount(id: number) {
 		const next = new Set(form.accountIds);
@@ -257,29 +240,7 @@
 					<Icon name={form.icon} size={22} />
 				</div>
 			</div>
-			<input type="search" bind:value={iconQuery} placeholder="Search icons…" class="mb-2 w-full" />
-			<div class="space-y-2">
-				{#each filteredGroups as g (g.label)}
-					<div>
-						<div class="section-label mb-1">{g.label}</div>
-						<div class="grid grid-cols-8 gap-1 sm:grid-cols-10">
-							{#each g.icons as p (p)}
-								<button
-									type="button"
-									title={iconLabel(p)}
-									class="flex h-8 w-8 items-center justify-center rounded transition-colors {form.icon === p
-										? 'bg-brand-500 text-white'
-										: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}"
-									onclick={() => (form.icon = p)}
-									aria-label={iconLabel(p)}
-								>
-									<Icon name={p} size={18} />
-								</button>
-							{/each}
-						</div>
-					</div>
-				{/each}
-			</div>
+			<IconPicker bind:value={form.icon} resetKey={open} />
 		</div>
 
 		<div>
