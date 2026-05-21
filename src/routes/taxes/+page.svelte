@@ -1055,6 +1055,9 @@
 		<p class="mt-1 text-sm text-brand-700/80 dark:text-brand-200/80">
 			Type the numbers above into the matching screens in FreeTaxUSA. Tip: open this page in one window and your tax return in another.
 		</p>
+		<div class="mt-3 rounded-lg border border-brand-200/60 bg-white/50 px-4 py-3 text-xs text-brand-800/70 dark:border-brand-500/20 dark:bg-slate-900/40 dark:text-brand-200/60">
+			<span class="font-semibold">Heads up:</span> The figures on this page are estimates based on how your transactions are categorized — they're a helpful starting point, not a guarantee. IRS definitions can be nuanced, and not every transaction that looks like a deduction will qualify. Review each amount against your actual receipts and statements, apply your own judgment, and consult a tax professional if you're unsure.
+		</div>
 	</section>
 </div>
 
