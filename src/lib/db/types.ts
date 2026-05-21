@@ -34,6 +34,8 @@ export interface Transaction {
 	notes: string;
 	cleared: number; // 0 | 1
 	businessId: number | null;
+	/** Optional receipt photo (JPEG blob, ≤ ~150 KB after compression). Mobile-captured. */
+	receiptBlob?: Blob | null;
 	/** @deprecated kept for v2 backward read compatibility; written rows use businessId only */
 	isBusiness?: number;
 	createdAt: number;

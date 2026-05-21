@@ -9,6 +9,8 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import ReceiptLightbox from '$lib/components/ReceiptLightbox.svelte';
+	import { compressImage } from '$lib/utils/image';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	const accounts = live<Account[]>(() => db.accounts.toArray(), []);
@@ -107,8 +109,47 @@
 		payee: '',
 		notes: '',
 		cleared: true,
-		businessId: null as number | null
+		businessId: null as number | null,
+		receiptBlob: null as Blob | null
 	});
+
+	// Receipt capture state
+	let receiptInput: HTMLInputElement | undefined = $state();
+	let receiptObjectUrl = $state<string | null>(null);
+	let receiptBusy = $state(false);
+
+	$effect(() => {
+		// Whenever the form's blob changes, refresh the preview URL
+		const blob = form.receiptBlob;
+		if (!blob) {
+			if (receiptObjectUrl) URL.revokeObjectURL(receiptObjectUrl);
+			receiptObjectUrl = null;
+			return;
+		}
+		const url = URL.createObjectURL(blob);
+		receiptObjectUrl = url;
+		return () => URL.revokeObjectURL(url);
+	});
+
+	async function onPickReceipt(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = ''; // allow picking the same file again later
+		if (!file) return;
+		receiptBusy = true;
+		try {
+			form.receiptBlob = await compressImage(file);
+		} catch (err) {
+			console.warn('Receipt compress failed, using raw file', err);
+			form.receiptBlob = file;
+		} finally {
+			receiptBusy = false;
+		}
+	}
+
+	function removeReceipt() {
+		form.receiptBlob = null;
+	}
 
 	function openCreate() {
 		editing = null;
@@ -121,7 +162,8 @@
 			payee: '',
 			notes: '',
 			cleared: true,
-			businessId: null
+			businessId: null,
+			receiptBlob: null
 		};
 		showModal = true;
 	}
@@ -137,7 +179,8 @@
 			payee: t.payee,
 			notes: t.notes,
 			cleared: t.cleared === 1,
-			businessId: t.businessId ?? null
+			businessId: t.businessId ?? null,
+			receiptBlob: t.receiptBlob ?? null
 		};
 		showModal = true;
 	}
@@ -154,7 +197,8 @@
 			payee: form.payee.trim(),
 			notes: form.notes.trim(),
 			cleared: form.cleared ? 1 : 0,
-			businessId: form.businessId
+			businessId: form.businessId,
+			receiptBlob: form.receiptBlob
 		};
 		if (editing?.id) {
 			await db.transactions.update(editing.id, payload);
@@ -163,6 +207,10 @@
 		}
 		showModal = false;
 	}
+
+	// Lightbox state for viewing receipts from the list
+	let lightboxBlob = $state<Blob | null>(null);
+	let lightboxTitle = $state('');
 
 	async function remove(t: Transaction) {
 		if (!t.id) return;
@@ -256,7 +304,17 @@
 							<div class="mt-0.5 truncate text-xs text-slate-500">{t.notes}</div>
 						{/if}
 					</div>
-					<div class="flex shrink-0 gap-1">
+					<div class="flex shrink-0 items-center gap-1">
+						{#if t.receiptBlob}
+							<button
+								class="rounded-md p-1.5 text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+								onclick={() => { lightboxBlob = t.receiptBlob ?? null; lightboxTitle = t.payee || formatDate(t.date); }}
+								aria-label="View receipt"
+								title="View receipt"
+							>
+								<Icon name="images/camera" size={16} />
+							</button>
+						{/if}
 						<button
 							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
 							onclick={() => openEdit(t)}
@@ -377,9 +435,55 @@
 				{/each}
 			</select>
 		</div>
+
+		<!-- Receipt photo: mobile-only (camera capture isn't useful on desktop) -->
+		<div class="md:hidden">
+			<div class="mb-1 block text-sm font-medium">Receipt</div>
+			{#if form.receiptBlob && receiptObjectUrl}
+				<div class="flex items-start gap-3">
+					<button
+						type="button"
+						onclick={() => {
+							if (form.receiptBlob) {
+								lightboxBlob = form.receiptBlob;
+								lightboxTitle = form.payee || 'Receipt';
+							}
+						}}
+						class="block h-24 w-24 shrink-0 overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
+						aria-label="View receipt"
+					>
+						<img src={receiptObjectUrl} alt="" class="h-full w-full object-cover" />
+					</button>
+					<div class="flex flex-col gap-2">
+						<Button size="sm" variant="secondary" onclick={() => receiptInput?.click()} disabled={receiptBusy}>Replace</Button>
+						<Button size="sm" variant="ghost" onclick={removeReceipt} disabled={receiptBusy}>Remove</Button>
+					</div>
+				</div>
+			{:else}
+				<button
+					type="button"
+					onclick={() => receiptInput?.click()}
+					disabled={receiptBusy}
+					class="flex w-full items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 px-4 py-4 text-sm font-medium text-slate-600 transition-colors hover:border-brand-500 hover:text-brand-600 active:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:active:bg-slate-800"
+				>
+					<Icon name="images/camera" size={18} />
+					{receiptBusy ? 'Processing…' : 'Take or upload receipt'}
+				</button>
+			{/if}
+			<input
+				bind:this={receiptInput}
+				type="file"
+				accept="image/*"
+				capture="environment"
+				class="hidden"
+				onchange={onPickReceipt}
+			/>
+		</div>
 	</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (showModal = false)}>Cancel</Button>
 		<Button type="submit" onclick={save}>{editing ? 'Save' : 'Create'}</Button>
 	{/snippet}
 </Modal>
+
+<ReceiptLightbox blob={lightboxBlob} title={lightboxTitle} onclose={() => (lightboxBlob = null)} />
