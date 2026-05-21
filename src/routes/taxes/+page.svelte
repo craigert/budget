@@ -280,6 +280,49 @@
 		retirementBuckets.filter((b) => b.plan.deductible).reduce((s, b) => s + b.total, 0)
 	);
 
+	// === College & education expenses (Form 8863) ===
+	const educationTxs = $derived.by(() => {
+		// Category-name match
+		const eduCats = categories.value.filter((c) =>
+			/tuition|education|college|universit|school|textbook|course|class/i.test(c.name)
+		);
+		const eduCatIds = new Set(eduCats.map((c) => c.id!));
+		const fromCat = txs.value.filter(
+			(t) => t.amount < 0 && t.categoryId != null && eduCatIds.has(t.categoryId)
+		);
+		// Payee / notes heuristic for uncategorised transactions
+		const heur = txs.value.filter((t) => {
+			if (t.categoryId != null && eduCatIds.has(t.categoryId)) return false;
+			const blob = `${t.payee} ${t.notes}`.toLowerCase();
+			return t.amount < 0 && /\b(tuition|universit|college|textbook|course fee|enrollment fee|registration fee)\b/.test(blob);
+		});
+		return [...fromCat, ...heur];
+	});
+
+	const educationByType = $derived.by(() => {
+		const buckets: Record<'tuition' | 'books' | 'supplies' | 'equipment' | 'other', Transaction[]> = {
+			tuition: [], books: [], supplies: [], equipment: [], other: []
+		};
+		for (const t of educationTxs) {
+			const catName = t.categoryId != null ? (categoryMap.get(t.categoryId)?.name ?? '') : '';
+			const blob = `${catName} ${t.payee} ${t.notes}`.toLowerCase();
+			if (/tuition|enrollment|registrat|course.?fee|college|universit|school.?fee/.test(blob)) {
+				buckets.tuition.push(t);
+			} else if (/book|textbook|reading|course.?material/.test(blob)) {
+				buckets.books.push(t);
+			} else if (/suppli|stationar|notebook|binder|folder/.test(blob)) {
+				buckets.supplies.push(t);
+			} else if (/equipment|laptop|computer|calculat|software|tablet/.test(blob)) {
+				buckets.equipment.push(t);
+			} else {
+				buckets.other.push(t);
+			}
+		}
+		return buckets;
+	});
+
+	const educationTotal = $derived(sumAbs(educationTxs));
+
 	// === AGI (user-supplied, persisted to settings) ===
 	let agi = $state(0);
 	$effect(() => {
@@ -941,6 +984,69 @@
 				</div>
 			{/each}
 		</div>
+	</section>
+
+	<!-- College & education expenses -->
+	<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+		<div class="mb-3 flex items-start justify-between gap-2">
+			<div>
+				<h2 class="text-lg font-semibold">College &amp; education expenses</h2>
+				<p class="mt-1 text-xs text-slate-500">Form 8863 — American Opportunity Credit &amp; Lifetime Learning Credit. Qualifying expenses: tuition, fees, books, supplies, and required equipment.</p>
+			</div>
+			<div class="text-right">
+				<div class="text-2xl font-semibold tabular-nums">{money(educationTotal)}</div>
+				<div class="text-xs text-slate-500">{educationTxs.length} expense(s)</div>
+			</div>
+		</div>
+
+		{#if educationTxs.length > 0}
+			<!-- Summary rows by type -->
+			<div class="mb-3 grid gap-2 sm:grid-cols-2">
+				{#each [
+					{ key: 'tuition',   label: 'Tuition & Fees',  txs: educationByType.tuition },
+					{ key: 'books',     label: 'Books',           txs: educationByType.books },
+					{ key: 'supplies',  label: 'Supplies',        txs: educationByType.supplies },
+					{ key: 'equipment', label: 'Equipment',       txs: educationByType.equipment },
+					{ key: 'edu-other', label: 'Other',           txs: educationByType.other },
+				] as row (row.key)}
+					{#if row.txs.length > 0}
+						{@const subkey = `edu-${row.key}`}
+						<div class="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+							<button
+								class="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
+								onclick={() => toggleExpand(subkey)}
+							>
+								<span class="text-sm font-medium">{row.label}</span>
+								<div class="flex items-center gap-3">
+									<span class="tabular-nums text-sm">{money(sumAbs(row.txs))}</span>
+									<span class="text-xs text-slate-400">{isOpen(subkey) ? '−' : '+'}</span>
+								</div>
+							</button>
+							{#if isOpen(subkey)}
+								<ul class="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+									{#each row.txs as t (t.id)}
+										{@const r = renderTxRow(t)}
+										<li class="flex items-center gap-2 px-3 py-1.5 text-xs">
+											<span class="w-24 shrink-0 text-slate-500">{formatDate(t.date)}</span>
+											<span class="flex-1 truncate">{t.payee || '(no payee)'}</span>
+											<span class="w-24 shrink-0 truncate text-slate-500">{r.cat?.name ?? ''}</span>
+											<span class="w-24 shrink-0 text-right tabular-nums">{money(t.amount)}</span>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+					{/if}
+				{/each}
+			</div>
+			<p class="text-[11px] text-slate-500">
+				AOC max credit: $2,500 (first 4 years). LLC max credit: $2,000 (20% of first $10,000). Cannot claim both in the same year.
+			</p>
+		{:else}
+			<p class="text-sm text-slate-500">
+				No education expenses detected for {year}. Tag transactions with a category containing "Tuition", "Education", "College", or similar to populate this section.
+			</p>
+		{/if}
 	</section>
 
 	<!-- FreeTaxUSA handoff banner -->
