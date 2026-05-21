@@ -50,10 +50,10 @@
 	});
 </script>
 
-<div class="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-6">
+<div class="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-8">
 	<svg
 		viewBox="0 0 {size} {size}"
-		class="block h-60 w-60 shrink-0 -rotate-90 sm:h-64 sm:w-64"
+		class="block h-72 w-72 shrink-0 -rotate-90 sm:h-80 sm:w-80"
 		role="img"
 		aria-label="Donut chart"
 	>
@@ -118,7 +118,7 @@
 		</g>
 	</svg>
 
-	<ul class="grid flex-1 self-stretch gap-x-6 gap-y-1.5 text-sm sm:py-2 {segments.length > 6 ? 'sm:grid-cols-2' : 'grid-cols-1'}">
+	<ul class="flex-1 space-y-1.5 self-stretch text-sm sm:py-2">
 		{#if segments.length === 0}
 			<li class="text-slate-500">No data yet.</li>
 		{/if}
@@ -131,8 +131,8 @@
 				{#if seg.icon}
 					<span style="color:{seg.color}"><Icon name={seg.icon} size={14} /></span>
 				{/if}
-				<span class="truncate">{seg.label}</span>
-				<span class="text-xs font-medium tabular-nums text-slate-500">{seg.pct.toFixed(0)}%</span>
+				<span class="flex-1 truncate">{seg.label}</span>
+				<span class="shrink-0 text-xs font-medium tabular-nums text-slate-500">{seg.pct.toFixed(0)}%</span>
 			</li>
 		{/each}
 	</ul>
