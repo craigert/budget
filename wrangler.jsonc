@@ -34,6 +34,6 @@
   "vars": {
     "AZURE_DOC_INTEL_MODEL": "prebuilt-receipt",
     "AZURE_DOC_INTEL_API_VERSION": "2024-11-30",
-    "ALLOWED_ORIGINS": "https://budget-sparrow.budgeting.workers.dev,https://budgetsparrow.craigboren.com"
+    "ALLOWED_ORIGINS": "https://budgetsparrow.craigboren.com"
   }
 }
