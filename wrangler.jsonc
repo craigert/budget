@@ -13,6 +13,14 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  // Custom domain. The Worker still answers on its workers.dev subdomain
+  // (Cloudflare auto-provisions it), and adds budgetsparrow.craigboren.com
+  // as a primary custom domain. This requires craigboren.com to be a Zone
+  // in the same Cloudflare account; wrangler creates the CNAME + SSL cert
+  // on the next deploy.
+  "routes": [
+    { "pattern": "budgetsparrow.craigboren.com", "custom_domain": true }
+  ],
   // Plaintext runtime variables. These are checked into the public repo,
   // so DO NOT put anything sensitive here. They are the source of truth
   // for the Worker on every `wrangler deploy` — dashboard-added plaintext
@@ -26,6 +34,6 @@
   "vars": {
     "AZURE_DOC_INTEL_MODEL": "prebuilt-receipt",
     "AZURE_DOC_INTEL_API_VERSION": "2024-11-30",
-    "ALLOWED_ORIGINS": "https://budget-sparrow.budgeting.workers.dev"
+    "ALLOWED_ORIGINS": "https://budget-sparrow.budgeting.workers.dev,https://budgetsparrow.craigboren.com"
   }
 }
