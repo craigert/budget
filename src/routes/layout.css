@@ -5,98 +5,89 @@
 
 @theme {
 	/*
-	 * Brand ramp — derived from the Claude-designed "navy slate" palette
-	 * (the EDITMODE-saved default in Budget Sparrow.html). The 600 shade
-	 * is the design's primary brand color (#1A2A4E — deep navy). Used for
-	 * dark CTA buttons, chart lines, and active-nav tints. Positive money
-	 * still reads green via --bs-pos; the brand is intentionally low-
-	 * saturation so the green pops.
+	 * Brand ramp — referenced by a handful of legacy Tailwind classes
+	 * (text-brand-*, bg-brand-*). Kept here as a static mid-tone navy ramp;
+	 * the live design tokens are now driven by the theme engine in JS, so
+	 * pages should prefer var(--bs-brand) over text-brand-700.
 	 */
 	--color-brand-50: #f5f6fa;
 	--color-brand-100: #e2e6f0;
 	--color-brand-200: #c4cdde;
 	--color-brand-300: #94a4c6;
 	--color-brand-400: #5d76a8;
-	--color-brand-500: #28406f; /* design brand-2 */
-	--color-brand-600: #1a2a4e; /* design primary */
+	--color-brand-500: #28406f;
+	--color-brand-600: #1a2a4e;
 	--color-brand-700: #131f3a;
 	--color-brand-800: #0c1528;
 	--color-brand-900: #060a18;
 
-	/* Surface tokens kept for legacy refs; new code should read --bs-surface. */
 	--color-surface: #ffffff;
 	--color-surface-muted: #fafaf7;
 	--color-surface-strong: #f4f4ee;
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
-   Design tokens from the Claude Design "Budget Sparrow" handoff.
-   Light + dark variants of the "sparrow jungle" palette. Everything bs-
-   prefixed is a hand-off-defined token; reach for these in new components
-   instead of hard-coded Tailwind slate-*.
-   ────────────────────────────────────────────────────────────────────────── */
+/*
+ * Boot-time fallbacks for the bs-* token system. The runtime theme engine
+ * (src/lib/theme.svelte.ts) overwrites every one of these on documentElement
+ * before first paint. These values exist so unstyled fallback paint (e.g.
+ * SSR HTML before JS hydrates) reads as the Forest immersive palette ——
+ * cream page bg, dark forest hero panel, brass accent.
+ */
 :root {
-	/* Light — Claude Design "Navy slate" palette, exact values from theme.js */
-	--bs-bg: #fafaf7;
+	--bs-bg: #f5f2eb;
+	--bs-bg-2: #ede7d8;
+	--bs-bg-on: #1a1408;
+	--bs-bg-on-2: rgba(26, 20, 8, 0.65);
+	--bs-bg-on-3: rgba(26, 20, 8, 0.42);
+	--bs-bg-line: rgba(26, 20, 8, 0.08);
 	--bs-surface: #ffffff;
-	--bs-surface-2: #f4f4ee;
-	--bs-border: oklch(0.92 0.005 250);
-	--bs-border-2: oklch(0.86 0.008 250);
-	--bs-text: #0f172a;
-	--bs-text-2: #475569;
-	--bs-text-3: #94a3b8;
-	--bs-brand: #1a2a4e;
-	--bs-brand-2: #28406f;
-	--bs-brand-soft: oklch(0.94 0.02 260);
-	--bs-brand-tint: oklch(0.97 0.01 260);
-	--bs-accent: oklch(0.55 0.12 50);
-	--bs-accent-soft: oklch(0.94 0.05 50);
-	--bs-pos: oklch(0.55 0.10 158);
-	--bs-pos-soft: oklch(0.94 0.04 158);
-	--bs-neg: oklch(0.55 0.13 25);
-	--bs-neg-soft: oklch(0.94 0.03 25);
-	--bs-warn: oklch(0.65 0.12 60);
+	--bs-surface-2: #ede7d8;
+	--bs-surface-3: #e5dcc4;
+	--bs-border: rgba(26, 20, 8, 0.08);
+	--bs-border-2: rgba(26, 20, 8, 0.13);
+	--bs-text: #1a1408;
+	--bs-text-2: #5c4a2e;
+	--bs-text-3: #a39681;
+	--bs-brand: #1e5a2c;
+	--bs-brand-2: #3f8a50;
+	--bs-brand-3: #5fa856;
+	--bs-brand-soft: rgba(30, 90, 44, 0.1);
+	--bs-brand-tint: rgba(30, 90, 44, 0.05);
+	--bs-accent: #b07842;
+	--bs-accent-2: #c8945a;
+	--bs-accent-soft: rgba(176, 120, 66, 0.12);
+	--bs-accent-tint: rgba(176, 120, 66, 0.06);
+	--bs-pos: #1e8a3c;
+	--bs-pos-soft: rgba(30, 138, 60, 0.1);
+	--bs-neg: #c0492e;
+	--bs-neg-soft: rgba(192, 73, 46, 0.1);
+	--bs-warn: #c8945a;
 
-	/* Density / shape tokens */
+	/* Dark hero panel — sits on top of the cream page, holds the net-worth
+	   hero, goals card, etc. Separate from --bs-bg so the page bg stays cream
+	   regardless of which dark accent the design wants for highlight cards. */
+	--bs-panel: #1a2118;
+	--bs-panel-2: #28311f;
+	--bs-panel-tx: #e8e0cc;
+	--bs-panel-tx-2: rgba(232, 224, 204, 0.66);
+	--bs-panel-tx-3: rgba(232, 224, 204, 0.42);
+	--bs-panel-line: rgba(232, 224, 204, 0.12);
+
+	--bs-glass: rgba(245, 242, 235, 0.82);
+
 	--bs-radius: 14px;
 	--bs-radius-sm: 10px;
 	--bs-pad-card: 22px;
 	--bs-pad-row: 14px;
 	--bs-gap: 16px;
 	--bs-row-h: 60px;
-	--bs-shadow: 0 1px 0 rgba(15, 23, 42, 0.02), 0 1px 2px rgba(15, 23, 42, 0.04);
+	--bs-shadow: 0 1px 2px rgba(26, 20, 8, 0.04), 0 6px 20px rgba(26, 20, 8, 0.05);
 
-	/* Font tokens. Geist is primary, Geist Mono is used for tabular numbers
-	   (amounts, deltas), Fraunces is the editorial italic accent. */
 	--bs-font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-	--bs-font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
+	--bs-font-display: 'Fraunces', 'Times New Roman', serif;
 	--bs-font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 	--bs-font-serif: 'Fraunces', 'Times New Roman', serif;
 	--bs-font-feat: 'ss01' on, 'cv11' on;
-}
-
-:root.dark {
-	/* Dark — Claude Design "Navy slate" dark variant, exact values from theme.js */
-	--bs-bg: #0b1020;
-	--bs-surface: #111733;
-	--bs-surface-2: #0f1530;
-	--bs-border: oklch(0.28 0.02 260);
-	--bs-border-2: oklch(0.34 0.02 260);
-	--bs-text: #e6e8f0;
-	--bs-text-2: #9aa3be;
-	--bs-text-3: #5b6385;
-	--bs-brand: #c4ccff;
-	--bs-brand-2: #a6b0f0;
-	--bs-brand-soft: oklch(0.28 0.05 260);
-	--bs-brand-tint: oklch(0.22 0.04 260);
-	--bs-accent: oklch(0.72 0.12 50);
-	--bs-accent-soft: oklch(0.30 0.06 50);
-	--bs-pos: oklch(0.72 0.10 158);
-	--bs-pos-soft: oklch(0.30 0.05 158);
-	--bs-neg: oklch(0.68 0.13 25);
-	--bs-neg-soft: oklch(0.28 0.06 25);
-	--bs-warn: oklch(0.74 0.12 60);
-	--bs-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 html,
@@ -111,54 +102,69 @@ body {
 	font-feature-settings: var(--bs-font-feat);
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizeLegibility;
+	transition: background-color 280ms ease;
 }
 
-/* Reusable surface utility for cards that want the design's cream-on-cream
-   feel (lighter than bg, with a hairline border). */
 .bs-surface {
 	background: var(--bs-surface);
 	border: 0.5px solid var(--bs-border);
 	border-radius: var(--bs-radius);
 	box-shadow: var(--bs-shadow);
+	color: var(--bs-text);
 }
 
 /*
- * Card pattern migration without touching every page.
- *
- * The app uses ~38 cards of the form
- *   <... class="rounded-{xl,lg} border border-slate-200 bg-white p-X dark:border-slate-800 dark:bg-slate-900">
- * The compound class selectors below re-skin every one of those to the
- * design's cream surface + hairline border + 14px radius, in both light
- * and dark modes. Order of classes in the markup doesn't matter — CSS
- * compound selectors match the set, not the sequence.
- *
- * Limited to the exact "card" pattern so isolated bg-white usages (icon
- * tiles, modal headers, etc.) are unaffected.
+ * Card-pattern migration: every "rounded-{xl,lg,2xl} border border-slate-200
+ * bg-white …" element across pages is re-skinned to the cream-on-jungle
+ * card look, so the new palette propagates without touching every page.
  */
 .rounded-xl.border.border-slate-200.bg-white,
 .rounded-lg.border.border-slate-200.bg-white,
 .rounded-2xl.border.border-slate-200.bg-white {
 	background: var(--bs-surface);
+	color: var(--bs-text);
 	border-color: var(--bs-border);
 	border-width: 0.5px;
 	border-radius: var(--bs-radius);
 	box-shadow: var(--bs-shadow);
-	/* p-5 across pages → 20px; design wants 22px. Forced here so every card
-	   gets the design's exact card padding without per-page edits. */
 	padding: var(--bs-pad-card);
 }
 .dark .rounded-xl.dark\:border-slate-800.dark\:bg-slate-900,
 .dark .rounded-lg.dark\:border-slate-800.dark\:bg-slate-900,
 .dark .rounded-2xl.dark\:border-slate-800.dark\:bg-slate-900 {
 	background: var(--bs-surface);
+	color: var(--bs-text);
 	border-color: var(--bs-border);
 	border-width: 0.5px;
 	border-radius: var(--bs-radius);
 	box-shadow: var(--bs-shadow);
 }
 
-/* Form polish — pulls from design tokens so inputs feel native to the theme.
-   Falls back to the previous slate-on-white values via the bs-* defaults. */
+/*
+ * The new dark-jungle bg makes slate text classes hard to read. Re-map the
+ * most-used Tailwind slate text utilities to the bs-* equivalents so legacy
+ * pages stay legible without per-page edits. Use specificity to override
+ * Tailwind's @theme without `!important`.
+ */
+body :is(.text-slate-500, .text-slate-600) {
+	color: var(--bs-text-2);
+}
+body :is(.text-slate-400, .text-slate-700) {
+	color: var(--bs-text-2);
+}
+body :is(.text-slate-300) {
+	color: var(--bs-text-3);
+}
+body :is(.text-slate-900, .text-slate-800) {
+	color: var(--bs-text);
+}
+.dark body :is(.dark\:text-slate-100, .dark\:text-slate-200, .dark\:text-slate-300) {
+	color: var(--bs-text);
+}
+.dark body :is(.dark\:text-slate-400, .dark\:text-slate-500) {
+	color: var(--bs-text-2);
+}
+
 input[type='text'],
 input[type='number'],
 input[type='date'],
@@ -189,17 +195,14 @@ button {
 	font-family: inherit;
 }
 
-/* No tap-highlight on mobile (kept from prior). */
 * {
 	-webkit-tap-highlight-color: transparent;
 }
 
-/* Selection follows the brand (matches design's ::selection rule). */
 ::selection {
 	background: color-mix(in oklch, var(--bs-brand) 22%, transparent);
 }
 
-/* Scrollbars — slim, themed. */
 ::-webkit-scrollbar {
 	width: 10px;
 	height: 10px;
@@ -218,12 +221,8 @@ button {
 	background: transparent;
 }
 
-/*
- * Design tokens, lifted verbatim from components.jsx (Claude Design hand-off).
- * These are the precise visual primitives used across every card.
- */
+/* ── Hand-off typographic primitives ─────────────────────────────────── */
 
-/* Card section label — uppercase eyebrow above a KPI value or card title. */
 .section-label {
 	font-size: 11px;
 	font-weight: 500;
@@ -233,9 +232,6 @@ button {
 	font-family: var(--bs-font-sans);
 }
 
-/* KPI value (big number). 30px / 500 / tight tracking / display font.
-   The design intentionally uses weight 500 — bold/700 reads heavier than
-   intended and breaks the airy feel. */
 .bs-kpi {
 	font-family: var(--bs-font-display);
 	font-size: 30px;
@@ -246,7 +242,6 @@ button {
 	color: var(--bs-text);
 }
 
-/* Hero / big-number variant for the net-worth display. */
 .bs-display {
 	font-family: var(--bs-font-display);
 	font-size: 42px;
@@ -257,14 +252,17 @@ button {
 	color: var(--bs-text);
 }
 
-/* Monospace numeric (deltas, range buttons, $ figures). */
 .bs-mono {
 	font-family: var(--bs-font-mono);
 	font-variant-numeric: tabular-nums;
 }
 
-/* Tag pill — the "Excellent" / "↑ $10K" badges. Background is a 12% color-mix
-   of the token color, foreground is the token. */
+.bs-italic-num {
+	font-family: var(--bs-font-serif);
+	font-style: italic;
+	font-variant-numeric: tabular-nums;
+}
+
 .bs-tag {
 	display: inline-flex;
 	align-items: center;
@@ -274,6 +272,71 @@ button {
 	font-size: 12px;
 	font-weight: 500;
 	font-variant-numeric: tabular-nums;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Universal loading transition — every direct child of `.bs-tab-content`
+   (every top-level section on a page) cascades in with a staggered
+   translateY(10px) → 0 + opacity 0 → 1 reveal. Matches the DRise
+   sequence from desktop.jsx (delays 40 / 120 / 200 / 280 / 360 / 440 ms).
+   Pages don't need to wrap sections in <Rise> — they just render their
+   sections as direct children and get the same animation Budgets has.
+
+   For lists where each ITEM should cascade (e.g. the 2-col budget cards
+   grid), add `class="bs-rise-group"` to the container and the same
+   stagger applies to its direct children with a tighter 50 ms step.
+   ────────────────────────────────────────────────────────────────── */
+
+@keyframes bs-stagger-rise {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.bs-tab-content > * {
+	opacity: 0;
+	animation: bs-stagger-rise 520ms cubic-bezier(0.3, 0.8, 0.3, 1) forwards;
+}
+.bs-tab-content > *:nth-child(1) { animation-delay: 40ms; }
+.bs-tab-content > *:nth-child(2) { animation-delay: 120ms; }
+.bs-tab-content > *:nth-child(3) { animation-delay: 200ms; }
+.bs-tab-content > *:nth-child(4) { animation-delay: 280ms; }
+.bs-tab-content > *:nth-child(5) { animation-delay: 360ms; }
+.bs-tab-content > *:nth-child(6) { animation-delay: 440ms; }
+.bs-tab-content > *:nth-child(n + 7) { animation-delay: 520ms; }
+
+.bs-rise-group > * {
+	opacity: 0;
+	animation: bs-stagger-rise 480ms cubic-bezier(0.3, 0.8, 0.3, 1) forwards;
+}
+.bs-rise-group > *:nth-child(1) { animation-delay: 40ms; }
+.bs-rise-group > *:nth-child(2) { animation-delay: 90ms; }
+.bs-rise-group > *:nth-child(3) { animation-delay: 140ms; }
+.bs-rise-group > *:nth-child(4) { animation-delay: 190ms; }
+.bs-rise-group > *:nth-child(5) { animation-delay: 240ms; }
+.bs-rise-group > *:nth-child(6) { animation-delay: 290ms; }
+.bs-rise-group > *:nth-child(7) { animation-delay: 340ms; }
+.bs-rise-group > *:nth-child(8) { animation-delay: 390ms; }
+.bs-rise-group > *:nth-child(9) { animation-delay: 440ms; }
+.bs-rise-group > *:nth-child(n + 10) { animation-delay: 490ms; }
+
+/* ── Reduced-motion fallback ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+	.bs-tab-content > *,
+	.bs-rise-group > * {
+		opacity: 1;
+		transform: none;
+	}
 }
 
 /* Highlight flash for search-result deep links */

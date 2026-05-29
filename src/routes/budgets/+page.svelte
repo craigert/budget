@@ -5,11 +5,13 @@
 	import { spendingByCategory, incomingByCategory } from '$lib/db/queries';
 	import { goalCurrent, goalProgress } from '$lib/db/goals';
 	import { money, thisMonth, addMonths, monthLabel } from '$lib/utils/format';
-	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import CategoryFormModal from '$lib/components/CategoryFormModal.svelte';
 	import GoalFormModal from '$lib/components/GoalFormModal.svelte';
+	import ScreenTitle from '$lib/components/ScreenTitle.svelte';
+	import MoneyUp from '$lib/components/MoneyUp.svelte';
+	import Bar from '$lib/components/Bar.svelte';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
 
 	// ── Budget ────────────────────────────────────────────────────────────────
@@ -200,11 +202,11 @@
 	}
 </script>
 
-<PageHeader title="Budgets" eyebrow="{monthLabel(month).toUpperCase()} · {Math.round(usedPct)}% USED">
+<ScreenTitle title="Budgets" eyebrow="{monthLabel(month)} · {Math.round(usedPct)}% used">
 	{#snippet actions()}
 		<div
 			class="inline-flex items-center"
-			style="border: 0.5px solid var(--bs-border); border-radius: var(--bs-radius-sm); background: var(--bs-surface);"
+			style="border: 0.5px solid var(--bs-border); border-radius: 999px; background: var(--bs-surface);"
 		>
 			<button
 				type="button"
@@ -238,89 +240,90 @@
 			Add budget
 		</button>
 	{/snippet}
-</PageHeader>
+</ScreenTitle>
 
-<div class="space-y-6 p-4 md:p-8">
-	<!-- Headline overview -->
-	<section class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-		<div class="section-label">{monthLabel(month).toUpperCase()} · {Math.round(usedPct)}% USED</div>
-		<div class="mt-2 flex flex-wrap items-baseline gap-2">
-			<span class="bs-display" style="font-size: 36px;">{money(totalSpent)}</span>
-			<span class="bs-mono" style="font-size: 14px; color: var(--bs-text-3);">
-				of <span style="color: var(--bs-text-2);">{money(totalBudgeted)}</span>
-			</span>
-		</div>
-		<div class="mt-4 h-2 w-full overflow-hidden rounded-full" style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);">
-			<div
-				class="h-full transition-all"
-				style="width: {Math.min(100, usedPct)}%; background: {usedPct > 100 ? 'var(--bs-neg)' : usedPct > 80 ? 'var(--bs-warn)' : 'var(--bs-brand)'};"
-			></div>
-		</div>
-	</section>
+<!-- Each section below is a direct child of .bs-tab-content so the universal
+     stagger reveals them in order: title → hero → grid. -->
 
-	<!-- Expense category grid -->
-	{#if expense.length === 0}
-		<div class="rounded-xl p-10 text-center" style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);">
-			<p style="color: var(--bs-text-2);">No categories yet. Add one to start budgeting.</p>
-			<div class="mt-4">
-				<Button onclick={() => openAddCategory('expense')}>+ Add category</Button>
+<!-- Dark "Spent so far" hero -->
+<section class="bs-budgets-hero">
+	<div class="bs-hero-glow" aria-hidden="true"></div>
+	<div style="position: relative;">
+				<div class="bs-budgets-hero-eyebrow">Spent so far</div>
+				<div class="bs-budgets-hero-row">
+					<span class="bs-budgets-hero-amount">
+						<MoneyUp value={totalSpent} duration={1000} />
+					</span>
+					<span class="bs-budgets-hero-of">of {money(totalBudgeted)}</span>
+				</div>
+				<div style="margin-top: 16px; max-width: 480px;">
+					<Bar
+						value={totalSpent}
+						max={totalBudgeted || 1}
+						color="var(--bs-brand-3)"
+						track="rgba(232,224,204,0.14)"
+						height={8}
+					/>
+				</div>
+				<div class="bs-budgets-hero-meta">
+					{#if usedPct < 100}
+						{Math.round(100 - usedPct)}% left · {daysLeftInMonth} day{daysLeftInMonth === 1 ? '' : 's'} remaining
+					{:else}
+						{Math.round(usedPct - 100)}% over budget
+					{/if}
+				</div>
 			</div>
+</section>
+
+<!-- Expense category grid — bs-rise-group cascades each card per DBudgets. -->
+{#if expense.length === 0}
+	<div class="rounded-xl p-10 text-center" style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);">
+		<p style="color: var(--bs-text-2);">No categories yet. Add one to start budgeting.</p>
+		<div class="mt-4">
+			<Button onclick={() => openAddCategory('expense')}>+ Add category</Button>
 		</div>
-	{:else}
-		<ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-			{#each expense as c (c.id)}
-				{@const budgeted = budgetMap.get(c.id!)?.amount ?? 0}
-				{@const spent = spendMap.get(c.id!) ?? 0}
-				{@const remaining = budgeted - spent}
-				{@const pct = budgeted > 0 ? (spent / budgeted) * 100 : 0}
-				{@const over = budgeted > 0 && spent > budgeted}
-				{@const status = statusFor(budgeted, spent)}
-				<li>
-					<button
-						type="button"
-						onclick={() => openEdit(c)}
-						class="w-full rounded-xl border border-slate-200 bg-white text-left transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
-					>
-						<div class="flex items-start gap-3">
+	</div>
+{:else}
+	<ul class="bs-budget-grid bs-rise-group">
+		{#each expense as c, i (c.id)}
+			{@const budgeted = budgetMap.get(c.id!)?.amount ?? 0}
+			{@const spent = spendMap.get(c.id!) ?? 0}
+			{@const remaining = budgeted - spent}
+			{@const over = budgeted > 0 && spent > budgeted}
+			<li>
+				<button type="button" onclick={() => openEdit(c)} class="bs-budget-card">
+					<div class="bs-budget-card-head">
+						<span
+							class="bs-budget-cat-icon"
+							style="background: color-mix(in oklch, {c.color} 15%, transparent); color: {c.color};"
+						>
+							<Icon name={c.icon} size={18} />
+						</span>
+						<div class="bs-budget-card-text">
+							<div class="bs-budget-card-name">{c.name}</div>
 							<div
-								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-								style="background: color-mix(in oklch, {c.color} 14%, var(--bs-surface)); color: {c.color}; border: 0.5px solid color-mix(in oklch, {c.color} 28%, transparent);"
+								class="bs-budget-card-sub"
+								style="color: {over ? 'var(--bs-neg)' : 'var(--bs-text-3)'};"
 							>
-								<Icon name={c.icon} size={18} />
+								{#if budgeted === 0}
+									No budget set
+								{:else if over}
+									{money(-remaining)} over
+								{:else}
+									{money(remaining)} left
+								{/if}
 							</div>
-							<div class="min-w-0 flex-1">
-								<div class="truncate text-sm font-medium" style="color: var(--bs-text); font-size: 13.5px;">{c.name}</div>
-								<div class="truncate text-xs" style="font-size: 11.5px; color: {status.tone === 'neg' ? 'var(--bs-neg)' : status.tone === 'warn' ? 'var(--bs-warn)' : 'var(--bs-text-3)'};">
-									{status.label}
-								</div>
-							</div>
-							{#if budgeted > 0}
-								<span
-									class="bs-tag bs-mono"
-									style="background: color-mix(in oklch, {status.tone === 'neg' ? 'var(--bs-neg)' : status.tone === 'warn' ? 'var(--bs-warn)' : 'var(--bs-text-3)'} 12%, transparent); color: {status.tone === 'neg' ? 'var(--bs-neg)' : status.tone === 'warn' ? 'var(--bs-warn)' : 'var(--bs-text-2)'};"
-								>{over ? 'Over' : `${Math.round(pct)}%`}</span>
-							{/if}
 						</div>
-						<div class="mt-4 flex items-baseline justify-between gap-2">
-							<span class="bs-kpi" style="font-size: 26px;">{money(spent)}</span>
-							<span class="bs-mono" style="font-size: 12px; color: var(--bs-text-3);">/ {money(budgeted)}</span>
+						<div class="bs-budget-card-amount">
+							<span class="bs-italic-num bs-budget-card-spent" style="color: {over ? 'var(--bs-neg)' : 'var(--bs-text)'};">{money(spent)}</span>
+							<span class="bs-budget-card-cap"> / {money(budgeted)}</span>
 						</div>
-						<div class="mt-3 h-1.5 w-full overflow-hidden rounded-full" style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);">
-							<div class="h-full transition-all" style="width: {Math.min(100, pct)}%; background: {over ? 'var(--bs-neg)' : c.color};"></div>
-						</div>
-						<div class="mt-3" style="font-size: 12px; color: var(--bs-text-3);">
-							{#if budgeted === 0 && spent === 0}
-								<span>No budget set · tap to add</span>
-							{:else if over}
-								<span class="bs-mono" style="color: var(--bs-neg);">{money(-remaining)}</span><span> over</span>
-							{:else}
-								<span class="bs-mono" style="color: var(--bs-text-2);">{money(remaining)}</span><span> left this month</span>
-							{/if}
-						</div>
-					</button>
-				</li>
-			{/each}
-		</ul>
+					</div>
+					<Bar value={spent} max={budgeted || 1} color={c.color} {over} delay={150 + i * 30} />
+				</button>
+			</li>
+		{/each}
+	</ul>
 	{/if}
 
 	<!-- Goals -->
@@ -455,7 +458,6 @@
 			</ul>
 		</details>
 	{/if}
-</div>
 
 <CategoryFormModal
 	open={showCategoryModal}
@@ -525,3 +527,133 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	/* Layout's .bs-tab-content provides flex column + gap. */
+
+	/* ── Dark "Spent so far" hero ───────────────────────────────────── */
+	.bs-budgets-hero {
+		position: relative;
+		overflow: hidden;
+		background: var(--bs-panel, var(--bs-bg-2));
+		color: var(--bs-panel-tx, var(--bs-bg-on));
+		border-radius: 20px;
+		padding: clamp(20px, 4vw, 26px) clamp(22px, 4vw, 28px);
+		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18), 0 18px 40px rgba(0, 0, 0, 0.16);
+	}
+	.bs-hero-glow {
+		position: absolute;
+		top: -70px;
+		right: -30px;
+		width: 220px;
+		height: 220px;
+		border-radius: 50%;
+		background: radial-gradient(circle at center, color-mix(in oklch, var(--bs-brand-3) 18%, transparent) 0%, transparent 70%);
+		pointer-events: none;
+	}
+	.bs-budgets-hero-eyebrow {
+		font-size: 12px;
+		color: var(--bs-panel-tx-2, var(--bs-bg-on-2));
+		margin-bottom: 6px;
+	}
+	.bs-budgets-hero-row {
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+	}
+	.bs-budgets-hero-amount {
+		font-family: var(--bs-font-serif);
+		font-style: italic;
+		font-weight: 400;
+		font-size: 44px;
+		line-height: 1;
+		color: var(--bs-panel-tx, var(--bs-bg-on));
+		font-variant-numeric: tabular-nums;
+	}
+	.bs-budgets-hero-of {
+		font-family: var(--bs-font-serif);
+		font-style: italic;
+		font-size: 17px;
+		color: var(--bs-panel-tx-2, var(--bs-bg-on-2));
+		font-variant-numeric: tabular-nums;
+	}
+	.bs-budgets-hero-meta {
+		margin-top: 10px;
+		font-size: 12px;
+		color: var(--bs-panel-tx-2, var(--bs-bg-on-2));
+	}
+
+	/* ── 2-col budget card grid ─────────────────────────────────────── */
+	.bs-budget-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 12px;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	@media (min-width: 720px) {
+		.bs-budget-grid {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.bs-budget-card {
+		display: block;
+		width: 100%;
+		background: var(--bs-surface);
+		border-radius: 20px;
+		padding: 18px;
+		text-align: left;
+		border: none;
+		box-shadow: 0 1px 2px rgba(26, 20, 8, 0.04), 0 6px 18px rgba(26, 20, 8, 0.05);
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+		cursor: pointer;
+	}
+	.bs-budget-card:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 2px 4px rgba(26, 20, 8, 0.06), 0 12px 28px rgba(26, 20, 8, 0.07);
+	}
+	.bs-budget-card-head {
+		display: flex;
+		align-items: center;
+		gap: 11px;
+		margin-bottom: 12px;
+	}
+	.bs-budget-cat-icon {
+		width: 36px;
+		height: 36px;
+		flex-shrink: 0;
+		border-radius: 11px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.bs-budget-card-text {
+		flex: 1;
+		min-width: 0;
+	}
+	.bs-budget-card-name {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--bs-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.bs-budget-card-sub {
+		font-size: 11.5px;
+		margin-top: 1px;
+	}
+	.bs-budget-card-amount {
+		text-align: right;
+		flex-shrink: 0;
+	}
+	.bs-budget-card-spent {
+		font-size: 18px;
+	}
+	.bs-budget-card-cap {
+		font-size: 12px;
+		color: var(--bs-text-3);
+	}
+</style>

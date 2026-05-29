@@ -4,13 +4,18 @@
 	import { live } from '$lib/db/live.svelte';
 	import type { Account, Business, Category, Transaction } from '$lib/db/types';
 	import { money, formatDate, todayISO, thisMonth, monthLabel } from '$lib/utils/format';
-	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ReceiptLightbox from '$lib/components/ReceiptLightbox.svelte';
 	import BusinessFormModal from '$lib/components/BusinessFormModal.svelte';
 	import AddTransactionsToBusinessModal from '$lib/components/AddTransactionsToBusinessModal.svelte';
+	import BrandMark from '$lib/components/BrandMark.svelte';
+	import ScreenTitle from '$lib/components/ScreenTitle.svelte';
+
+	type SignFilter = 'all' | 'spend' | 'income';
+	let signFilter = $state<SignFilter>('all');
+	let showAdvanced = $state(false);
 	import { compressImage } from '$lib/utils/image';
 	import { scanReceiptWithAzure } from '$lib/utils/receiptOcr';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
@@ -87,6 +92,8 @@
 	const filtered = $derived.by(() => {
 		const qq = q.trim().toLowerCase();
 		return txs.value.filter((t) => {
+			if (signFilter === 'spend' && t.amount >= 0) return false;
+			if (signFilter === 'income' && t.amount <= 0) return false;
 			if (businessFilter === 'all' && t.businessId == null) return false;
 			if (typeof businessFilter === 'number' && t.businessId !== businessFilter) return false;
 			if (accountFilter !== '' && t.accountId !== accountFilter) return false;
@@ -391,21 +398,40 @@
 	let lightboxTitle = $state('');
 </script>
 
-<PageHeader title="Transactions" subtitle={`${filtered.length} shown · net ${money(totalShown)}`}>
+<ScreenTitle
+	title="Transactions"
+	eyebrow={`All accounts · ${monthLabel(now)} · ${filtered.length} shown`}
+>
 	{#snippet actions()}
-		{#if businesses.value.length > 0 && businessFilter !== null && filtered.length > 0}
-			<Button variant="secondary" onclick={exportCSV}>Export CSV</Button>
-		{/if}
-		{#if businesses.value.length > 0}
-			<Button variant="secondary" onclick={() => (showAddTxModal = true)}>+ Add to business</Button>
-		{/if}
-		<Button variant="secondary" onclick={openAddBusiness}>+ New business</Button>
+		<button
+			type="button"
+			class="bs-screen-action"
+			onclick={() => (showAdvanced = !showAdvanced)}
+			aria-pressed={showAdvanced}
+		>
+			{showAdvanced ? 'Hide filters' : 'More filters'}
+		</button>
 		<Button variant="onbrand" onclick={openCreate} disabled={accounts.value.length === 0}>+ Transaction</Button>
 	{/snippet}
-</PageHeader>
+</ScreenTitle>
 
-<div class="space-y-4 p-4 md:p-8">
+<!-- Sign filter pills — the headline filter from the design's DTransactions.
+     Each section below is a direct child of the layout's .bs-tab-content so
+     the universal stagger animation reveals them in order. -->
+<div class="bs-filter-row">
+		{#each [{ id: 'all' as const, label: 'All' }, { id: 'spend' as const, label: 'Spending' }, { id: 'income' as const, label: 'Income' }] as f (f.id)}
+			<button
+				type="button"
+				class="bs-filter-pill"
+				class:active={signFilter === f.id}
+				onclick={() => (signFilter = f.id)}
+			>{f.label}</button>
+		{/each}
+	</div>
 
+	<!-- Advanced controls — hidden by default per the design's clean view.
+	     Toggle from the "More filters" button in the header. -->
+	{#if showAdvanced}
 	<!-- Business filter pills (only when businesses exist) -->
 	{#if businesses.value.length > 0}
 		<div class="flex flex-wrap items-center gap-2">
@@ -494,6 +520,7 @@
 	<div class="flex items-center gap-2 text-sm">
 		<button class="text-slate-500 hover:underline" onclick={resetFilters}>Clear filters</button>
 	</div>
+	{/if}
 
 	{#if accounts.value.length === 0}
 		<div class="rounded-lg border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700">
@@ -512,148 +539,62 @@
 			{/if}
 		</div>
 	{:else}
-		<ul class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+		<!-- DTransactions-style table card: header row + grouped rows. Each row
+		     uses the merchant brand mark from BrandMark, category icon chip,
+		     italic-Fraunces amount aligned right. Click to open the existing
+		     edit modal so all the legacy add/edit/business/receipt logic stays
+		     functional underneath. -->
+		<div class="bs-tx-card">
+			<div class="bs-tx-header">
+				<span>Merchant</span>
+				<span>Category</span>
+				<span>Account</span>
+				<span style="text-align: right;">Amount</span>
+			</div>
+		<ul class="bs-tx-list">
 			{#each shown as t (t.id)}
 				{@const cat = t.categoryId != null ? categoryMap.get(t.categoryId) : null}
 				{@const acct = accountMap.get(t.accountId)}
 				{@const biz = t.businessId != null ? businessMap.get(t.businessId) : null}
-				<li data-tx-id={t.id} class="group relative border-b border-slate-100 last:border-b-0 dark:border-slate-800">
-					<!-- Mobile: whole row is tap-to-edit so the row doesn't need
-					     dedicated inline icons (the right column was eating most
-					     of the width and truncating the payee to "T..."). On
-					     desktop the inline icons reveal on hover as the quick
-					     affordance. -->
+				<li data-tx-id={t.id} class="bs-tx-li" class:bs-tx-li-first={false}>
 					<button
 						type="button"
+						class="bs-tx-row"
 						onclick={() => openEdit(t)}
-						class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--bs-surface-2)] md:hidden"
 						aria-label="Edit transaction"
 					>
-						<div
-							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
-							style="background:{cat?.color ?? '#94a3b8'}22;color:{cat?.color ?? '#475569'}"
-						>
-							{#if cat?.icon}<Icon name={cat.icon} size={18} />{:else}<span>·</span>{/if}
-						</div>
-						<div class="min-w-0 flex-1">
-							<div class="flex items-baseline justify-between gap-2">
-								<div class="truncate text-sm font-medium" style="color: var(--bs-text);">{t.payee || '(no payee)'}</div>
-								<div class="shrink-0 text-sm font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
-									{money(t.amount)}
-								</div>
+						<div class="bs-tx-merchant">
+							<BrandMark name={t.payee || cat?.name || 'Transaction'} size={38} radius={12} />
+							<div class="bs-tx-merchant-text">
+								<div class="bs-tx-merchant-name">{t.payee || '(no payee)'}</div>
+								<div class="bs-tx-merchant-sub">{formatDate(t.date)}</div>
 							</div>
-							<!--
-								Single-line meta. The previous "flex flex-wrap" made
-								every segment (date · category · account) its own
-								wrap-eligible chunk, so on narrow mobile widths each
-								piece dropped to its own row and made rows ~110px tall.
-								Joined as a plain string with truncate so the row stays
-								~60px regardless of content length.
-							-->
-							<div class="mt-0.5 truncate text-xs" style="color: var(--bs-text-3);">
-								{formatDate(t.date)} · {cat?.name ?? 'Uncategorized'} · {acct?.name ?? '?'}
-							</div>
-							{#if biz || t.cleared === 0}
-								<div class="mt-1 flex flex-wrap items-center gap-1">
-									{#if t.cleared === 0}
-										<span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">pending</span>
-									{/if}
-									{#if biz}
-										<span class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style="background:{biz.color}22;color:{biz.color}">
-											<Icon name={biz.icon} size={10} />
-											{biz.name}
-										</span>
-									{/if}
-								</div>
-							{/if}
 						</div>
-					</button>
-
-					<!-- Desktop: original layout with inline edit/delete icons -->
-					<div class="hidden items-center gap-3 px-4 py-3 md:flex">
-					<div
-						class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
-						style="background:{cat?.color ?? '#94a3b8'}22;color:{cat?.color ?? '#475569'}"
-					>
-						{#if cat?.icon}<Icon name={cat.icon} size={20} />{:else}<span>·</span>{/if}
-					</div>
-					<div class="min-w-0 flex-1">
-						<div class="truncate font-medium">{t.payee || '(no payee)'}</div>
-						<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
-							<span>{formatDate(t.date)}</span>
-							<span aria-hidden>·</span>
-							<span class="truncate">{cat?.name ?? 'Uncategorized'}</span>
-							<span aria-hidden>·</span>
-							<span class="truncate">{acct?.name ?? '?'}</span>
-							{#if t.cleared === 0}
-								<span class="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">pending</span>
-							{/if}
-							{#if biz}
-								<span class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style="background:{biz.color}22;color:{biz.color}">
-									<Icon name={biz.icon} size={10} />
-									{biz.name}
+						<div class="bs-tx-category">
+							{#if cat}
+								<span class="bs-tx-cat-icon" style="background: color-mix(in oklch, {cat.color} 15%, transparent); color: {cat.color};">
+									{#if cat.icon}<Icon name={cat.icon} size={11} />{/if}
 								</span>
+								<span class="bs-tx-cat-label">{cat.name}</span>
+							{:else}
+								<span class="bs-tx-cat-label" style="color: var(--bs-text-3);">Uncategorized</span>
 							{/if}
 						</div>
-						{#if t.notes}
-							<div class="mt-0.5 truncate text-xs text-slate-500">{t.notes}</div>
+						<div class="bs-tx-account">{acct?.name ?? '?'}</div>
+						<div class="bs-tx-amount" style="color: {t.amount > 0 ? 'var(--bs-pos)' : 'var(--bs-text)'};">
+							{t.amount > 0 ? '+' : '−'}{money(Math.abs(t.amount))}
+						</div>
+						{#if biz}
+							<span class="bs-tx-biz-tag" style="background: color-mix(in oklch, {biz.color} 18%, transparent); color: {biz.color};">
+								<Icon name={biz.icon} size={10} />
+								{biz.name}
+							</span>
 						{/if}
-					</div>
-					<div class="w-24 shrink-0 text-right text-sm font-semibold tabular-nums {t.amount < 0 ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600 dark:text-emerald-400'}">
-						{money(t.amount)}
-					</div>
-					<div class="flex shrink-0 items-center gap-1">
-						{#if businesses.value.length > 0}
-							<!-- Inline business reassign — desktop only. On mobile the
-							     control would dominate the row and force the middle
-							     column to ~50px, which wraps the date word-by-word.
-							     Mobile users still see the business via the chip in
-							     the meta line below; assignment happens via the
-							     row's edit modal. -->
-							<select
-								class="hidden shrink-0 text-xs md:block"
-								value={t.businessId ?? ''}
-								onchange={(e) => {
-									const v = (e.currentTarget as HTMLSelectElement).value;
-									reassignTransaction(t, v === '' ? null : Number(v));
-								}}
-								aria-label="Assign business"
-							>
-								<option value="">Personal</option>
-								{#each businesses.value as b (b.id)}
-									<option value={b.id}>{b.name}</option>
-								{/each}
-							</select>
-						{/if}
-						{#if t.receiptBlob}
-							<button
-								class="rounded-md p-1.5 text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-								onclick={() => { lightboxBlob = t.receiptBlob ?? null; lightboxTitle = t.payee || formatDate(t.date); }}
-								aria-label="View receipt"
-								title="View receipt"
-							>
-								<Icon name="images/camera" size={16} />
-							</button>
-						{/if}
-						<button
-							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-							onclick={() => openEdit(t)}
-							aria-label="Edit"
-						>
-							<Icon name="general/edit-01" size={16} />
-						</button>
-						<button
-							class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 dark:hover:bg-slate-800"
-							onclick={() => remove(t)}
-							aria-label="Delete"
-						>
-							<Icon name="general/trash-01" size={16} />
-						</button>
-					</div>
-					</div>
+					</button>
 				</li>
 			{/each}
 		</ul>
+		</div>
 
 		{#if filtered.length > visibleCount}
 			<div class="flex justify-center">
@@ -661,7 +602,6 @@
 			</div>
 		{/if}
 	{/if}
-</div>
 
 <Modal
 	open={showModal}
@@ -796,3 +736,196 @@
 />
 
 <ReceiptLightbox blob={lightboxBlob} title={lightboxTitle} onclose={() => (lightboxBlob = null)} />
+
+<style>
+	/* Layout's .bs-tab-content provides flex column + gap; pages just
+	   render sections as direct children. */
+
+	.bs-filter-row {
+		display: flex;
+		gap: 8px;
+	}
+	:global(.bs-filter-pill) {
+		padding: 8px 16px;
+		border-radius: 999px;
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--bs-text-2);
+		background: var(--bs-surface);
+		border: 1px solid var(--bs-border);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+		transition: background 160ms, color 160ms, transform 0.05s ease;
+	}
+	:global(.bs-filter-pill:hover) {
+		color: var(--bs-text);
+	}
+	:global(.bs-filter-pill.active) {
+		background: var(--bs-panel, var(--bs-text));
+		color: var(--bs-panel-tx, var(--bs-bg));
+		border-color: transparent;
+		box-shadow: none;
+	}
+	:global(.bs-filter-pill:active) {
+		transform: scale(0.97);
+	}
+
+	:global(.bs-screen-action) {
+		padding: 7px 14px;
+		border-radius: 999px;
+		font-size: 12.5px;
+		font-weight: 500;
+		color: var(--bs-text-2);
+		background: var(--bs-surface);
+		border: 1px solid var(--bs-border);
+		transition: background 140ms, color 140ms;
+	}
+	:global(.bs-screen-action:hover) {
+		background: var(--bs-surface-2);
+		color: var(--bs-text);
+	}
+
+	/* ── Table card ──────────────────────────────────────────────────── */
+	.bs-tx-card {
+		background: var(--bs-surface);
+		border-radius: 20px;
+		overflow: hidden;
+		box-shadow: 0 1px 2px rgba(26, 20, 8, 0.04), 0 6px 20px rgba(26, 20, 8, 0.05);
+	}
+	.bs-tx-header {
+		display: grid;
+		grid-template-columns: 2.2fr 1.2fr 1fr 0.9fr;
+		padding: 14px 24px;
+		font-size: 11.5px;
+		color: var(--bs-text-3);
+		font-weight: 500;
+		text-transform: capitalize;
+		border-bottom: 1px solid var(--bs-border);
+	}
+	@media (max-width: 720px) {
+		.bs-tx-header {
+			display: none;
+		}
+	}
+	.bs-tx-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	.bs-tx-li {
+		border-top: 1px solid var(--bs-border);
+	}
+	.bs-tx-li:first-child {
+		border-top: none;
+	}
+	.bs-tx-row {
+		display: grid;
+		grid-template-columns: 2.2fr 1.2fr 1fr 0.9fr;
+		align-items: center;
+		padding: 13px 24px;
+		width: 100%;
+		text-align: left;
+		background: transparent;
+		border: none;
+		transition: background 0.12s ease;
+		gap: 12px;
+	}
+	.bs-tx-row:hover {
+		background: var(--bs-surface-2);
+	}
+	.bs-tx-row:active {
+		transform: scale(0.997);
+	}
+	@media (max-width: 720px) {
+		.bs-tx-row {
+			grid-template-columns: auto 1fr auto;
+			grid-template-areas:
+				'mark merchant amount'
+				'mark category category';
+			padding: 12px 16px;
+			row-gap: 4px;
+		}
+		.bs-tx-account {
+			display: none;
+		}
+		.bs-tx-merchant {
+			grid-area: merchant;
+		}
+		.bs-tx-category {
+			grid-area: category;
+		}
+		.bs-tx-amount {
+			grid-area: amount;
+		}
+	}
+
+	.bs-tx-merchant {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-width: 0;
+	}
+	.bs-tx-merchant-text {
+		min-width: 0;
+	}
+	.bs-tx-merchant-name {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--bs-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.bs-tx-merchant-sub {
+		font-size: 11.5px;
+		color: var(--bs-text-3);
+		margin-top: 2px;
+	}
+	.bs-tx-category {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		font-size: 12.5px;
+		color: var(--bs-text-2);
+		min-width: 0;
+	}
+	.bs-tx-cat-icon {
+		width: 22px;
+		height: 22px;
+		border-radius: 6px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+	.bs-tx-cat-label {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.bs-tx-account {
+		font-size: 12.5px;
+		color: var(--bs-text-2);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.bs-tx-amount {
+		font-family: var(--bs-font-serif);
+		font-style: italic;
+		font-size: 16px;
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.bs-tx-biz-tag {
+		grid-column: 1 / -1;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 2px 7px;
+		border-radius: 999px;
+		font-size: 10.5px;
+		font-weight: 500;
+		justify-self: start;
+		margin-top: 4px;
+	}
+</style>

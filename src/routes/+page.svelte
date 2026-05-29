@@ -1,24 +1,41 @@
 <script lang="ts">
+	/*
+	 * Home — exact recreation of proto/desktop.jsx DHome from the Claude
+	 * Design Forest reference (Desktop.html).
+	 *
+	 *   <DRise delay={40}>  full-width dark hero w/ greeting + 76px net-worth + 3 inline KPIs
+	 *   <DRise delay={120}> Sparrow Says insight banner
+	 *   <DRise delay={200}> grid(1.7fr 1fr): net-worth chart card + dark goals / brass health stack
+	 *   <DRise delay={280}> grid(1fr 1fr): Where money went + Recent activity
+	 *
+	 * All animations + spacing + typography from the bundle:
+	 *   - cards: 20px radius, 22px (or 28px hero) padding, no border, soft shadow
+	 *   - hero glow: solid 360x360 rgba(176,120,66,0.16) circle at top:-140 right:-40
+	 *   - italic numerals everywhere money appears (Fraunces 400 italic, tabular-nums)
+	 *   - Rise stagger 40/120/200/280, MoneyUp 900-1100ms ease-out-cubic, Bar 900ms
+	 */
 	import { db } from '$lib/db';
 	import { live } from '$lib/db/live.svelte';
 	import {
 		netWorth,
 		spendingByCategory,
 		incomeForMonth,
-		expensesForMonth,
-		accountBalances
+		expensesForMonth
 	} from '$lib/db/queries';
-	import type { Account, Category, Transaction } from '$lib/db/types';
-	import { money, thisMonth, monthLabel, formatDate } from '$lib/utils/format';
+	import { goalCurrent, goalProgress } from '$lib/db/goals';
+	import type { Account, Category, Goal, Transaction } from '$lib/db/types';
+	import { money, money0, thisMonth, monthLabel, friendlyDate } from '$lib/utils/format';
 	import { rollingMonthlySeries } from '$lib/utils/netWorthSeries';
 	import { base } from '$app/paths';
-	import PageHeader from '$lib/components/PageHeader.svelte';
-	import Donut from '$lib/components/Donut.svelte';
+	import { goto } from '$app/navigation';
 	import NetWorthChart from '$lib/components/NetWorthChart.svelte';
-	import Icon from '$lib/components/Icon.svelte';
+	import MoneyUp from '$lib/components/MoneyUp.svelte';
+	import Bar from '$lib/components/Bar.svelte';
+	import StackBar from '$lib/components/StackBar.svelte';
+	import SparrowSays from '$lib/components/SparrowSays.svelte';
+	import BrandMark from '$lib/components/BrandMark.svelte';
 
 	const month = thisMonth();
-	// Previous month, for vs-last-month deltas
 	const prevMonth = $derived.by(() => {
 		const [y, m] = month.split('-').map(Number);
 		const d = new Date(y, m - 2, 1);
@@ -31,25 +48,68 @@
 	const incPrev = live<number>(() => incomeForMonth(prevMonth), 0);
 	const expPrev = live<number>(() => expensesForMonth(prevMonth), 0);
 	const accounts = live<Account[]>(() => db.accounts.where('archived').equals(0).toArray(), []);
-	const balances = live<Map<number, number>>(() => accountBalances(), new Map());
 	const categories = live<Category[]>(() => db.categories.toArray(), []);
 	const spending = live<{ categoryId: number | null; total: number }[]>(
 		() => spendingByCategory(month),
 		[]
 	);
 	const recent = live<Transaction[]>(
-		() => db.transactions.orderBy('date').reverse().limit(8).toArray(),
+		() => db.transactions.orderBy('date').reverse().limit(6).toArray(),
 		[]
 	);
 	const allAccounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const allTxs = live<Transaction[]>(() => db.transactions.toArray(), []);
 
-	// Rolling 12 months of monthly snapshots so the chart's range filter
-	// (1M / 3M / 6M / YTD / 1Y / All) has real data behind every option.
 	const networthPoints = $derived(rollingMonthlySeries(allAccounts.value, allTxs.value, 12));
-
 	const catMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
-	const accountMap = $derived(new Map(accounts.value.map((a) => [a.id!, a])));
+
+	const savedThisMonth = $derived(inc.value - exp.value);
+	const savingsRate = $derived(inc.value > 0 ? (savedThisMonth / inc.value) * 100 : 0);
+
+	const healthScore = $derived.by(() => {
+		if (inc.value <= 0) return 0;
+		if (savedThisMonth < 0) return Math.max(0, Math.round(50 + savingsRate));
+		return Math.min(100, Math.round(50 + savingsRate * 1.5));
+	});
+
+	const incDelta = $derived(inc.value - incPrev.value);
+	const expDelta = $derived(exp.value - expPrev.value);
+	const savedPrev = $derived(incPrev.value - expPrev.value);
+	const ytdDelta = $derived(savedThisMonth - savedPrev);
+
+	const now = new Date();
+	const hour = now.getHours();
+	const greeting =
+		hour < 5 ? 'Good evening' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+	const dateLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+	const displayName = live<string | null>(
+		async () => {
+			const s = await db.settings.get('displayName');
+			return typeof s?.value === 'string' && s.value.trim() ? s.value.trim() : null;
+		},
+		null
+	);
+	const heroName = $derived(displayName.value ?? 'Jamie');
+	const monthAbbr = monthLabel(month).split(' ')[0];
+	const prevMonthAbbr = monthLabel(prevMonth).split(' ')[0];
+
+	const goalRows = live<{ goal: Goal; current: number; pct: number; pace: string }[]>(
+		async () => {
+			const list = await db.nestEggs.where('archived').equals(0).toArray();
+			const rows: { goal: Goal; current: number; pct: number; pace: string }[] = [];
+			for (const g of list) {
+				const current = await goalCurrent(g);
+				const prog = goalProgress(g, current);
+				rows.push({ goal: g, current, pct: Math.min(100, Math.max(0, prog.percent)), pace: prog.pace });
+			}
+			return rows.sort((a, b) => b.pct - a.pct);
+		},
+		[]
+	);
+	const onTrackCount = $derived(
+		goalRows.value.filter((r) => r.pace === 'ahead' || r.pace === 'on-track' || r.pace === 'complete').length
+	);
+	const totalGoals = $derived(goalRows.value.length);
 
 	const slices = $derived(
 		spending.value
@@ -59,330 +119,594 @@
 				return {
 					label: c?.name ?? 'Uncategorized',
 					value: s.total,
-					color: c?.color ?? '#94a3b8',
-					icon: c?.icon
+					color: c?.color ?? '#94a3b8'
 				};
 			})
-			.concat(
-				spending.value
-					.filter((s) => s.categoryId == null)
-					.map((s) => ({ label: 'Uncategorized', value: s.total, color: '#94a3b8', icon: '•' }))
-			)
 	);
+	const topSlices = $derived(slices.slice(0, 8));
+	const legendSlices = $derived(topSlices.slice(0, 6));
 
-	// Financial-health metric: savings rate = (income - expense) / income.
-	const savedThisMonth = $derived(inc.value - exp.value);
-	const savingsRate = $derived(inc.value > 0 ? (savedThisMonth / inc.value) * 100 : 0);
-	const healthScore = $derived.by(() => {
-		// Translate savings rate into a 0–100 score with light shaping so 20%
-		// (the 50/30/20 rule's savings band) reads as "Excellent" ~80.
-		if (inc.value <= 0) return 0;
-		if (savedThisMonth < 0) return Math.max(0, 50 + savingsRate); // negative pulls below 50
-		// Cap at 100; 20% saving = 80, 30% = 95, 40% = 100.
-		return Math.min(100, Math.round(50 + savingsRate * 1.5));
-	});
-	const healthLabel = $derived.by(() => {
-		if (inc.value <= 0) return 'Set income';
-		if (savedThisMonth < 0) return 'Overspending';
-		if (savingsRate >= 20) return 'Excellent';
-		if (savingsRate >= 10) return 'Good';
-		return 'Tight';
+	const sparrowText = $derived.by(() => {
+		if (inc.value <= 0) {
+			return `Log income for <em style="color: var(--bs-brand); font-weight: 500;">${monthLabel(month)}</em> and Sparrow will start tracking your pace.`;
+		}
+		const projected = Math.round(savedThisMonth);
+		if (projected >= 0 && savingsRate >= 10) {
+			return `You're on pace to save <em style="color: var(--bs-brand); font-weight: 500;">${money0(projected)}</em> this month — that's <em style="color: var(--bs-brand); font-weight: 500;">${savingsRate.toFixed(0)}%</em> of income.`;
+		}
+		if (projected >= 0) {
+			return `Spending is up but you're still in the green — <em style="color: var(--bs-brand); font-weight: 500;">${money0(projected)}</em> saved so far this month.`;
+		}
+		return `You're tracking <em style="color: var(--bs-neg); font-weight: 500;">${money0(Math.abs(projected))} short</em> this month — time to revisit the budget.`;
 	});
 
-	// Vs-last-month deltas for the KPI chips
-	const incDelta = $derived(inc.value - incPrev.value);
-	const expDelta = $derived(exp.value - expPrev.value);
+	type Range = '1M' | '3M' | 'YTD' | '1Y';
+	let nwRange = $state<Range>('YTD');
+	let scrubLabel = $state<string | null>(null);
 
-	// Greeting hero
-	const now = new Date();
-	const hour = now.getHours();
-	const greeting =
-		hour < 5 ? 'Good evening' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-	const dayLabel = `${monthLabel(month).toUpperCase()} · DAY ${now.getDate()}`;
-	// Display name — pulled from settings if user has set one; otherwise greeting
-	// stands alone with an exclamation point.
-	const displayName = live<string | null>(
-		async () => {
-			const s = await db.settings.get('displayName');
-			return typeof s?.value === 'string' && s.value.trim() ? s.value.trim() : null;
-		},
-		null
-	);
-
-	// Savings pace — projects current spending forward to a full-month figure.
-	const today = now.getDate();
-	const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-	const projectedSavings = $derived.by(() => {
-		if (inc.value <= 0 || today <= 0) return 0;
-		const ratio = daysInMonth / today;
-		return Math.round((inc.value - exp.value * ratio + (inc.value * ratio - inc.value)) * 100) / 100;
-	});
-	const prevSaved = $derived(incPrev.value - expPrev.value);
-	const paceDelta = $derived(prevSaved !== 0 ? ((projectedSavings - prevSaved) / Math.abs(prevSaved)) * 100 : 0);
+	function handleScrub(p: import('$lib/utils/netWorthSeries').NetWorthPoint | null) {
+		scrubLabel = p
+			? new Date(p.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+			: null;
+	}
 </script>
 
-<PageHeader title="Home" eyebrow={monthLabel(month).toUpperCase()}>
-	{#snippet actions()}
-		<a
-			href="{base}/transactions"
-			class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
-			style="background: var(--bs-text); color: var(--bs-bg);"
-		>
-			<Icon name="general/plus" size={14} />
-			Add transaction
-		</a>
-	{/snippet}
-</PageHeader>
-
-<div class="space-y-6 p-4 md:p-8">
-	<!--
-		Greeting hero. Per the design's screen-home.jsx:
-		- Backdrop: 120° linear-gradient(brand-soft → accent-soft) — uses the
-		  pre-mixed soft variants from the palette, NOT a runtime color-mix.
-		- Eyebrow: 11px / 600 / 0.10em tracking / brand color (NOT text-3).
-		- Title: 34px / 500 / -0.03em on desktop, 26px on mobile. Name is
-		  italic Geist colored with --bs-brand.
-		- Body: 14px text-2 with --bs-pos colored mono money inline.
-		- Sparrow logo on the right: 170px desktop, drop-shadow filter.
-	-->
-	<section
-		class="bs-hero relative overflow-hidden flex flex-wrap items-center gap-6"
-		style="border: 0.5px solid var(--bs-border); border-radius: var(--bs-radius); padding: 20px 18px; box-shadow: var(--bs-shadow);"
-	>
-		<div class="relative z-[1] flex-1 min-w-[240px]">
-			<div
-				class="mb-1.5"
-				style="font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: var(--bs-brand);"
-			>
-				{dayLabel}
-			</div>
-			<h2
-				class="m-0"
-				style="font-family: var(--bs-font-display); font-size: 26px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.05; color: var(--bs-text);"
-			>
-				{greeting}{#if displayName.value}, <span style="color: var(--bs-brand); font-style: italic; font-family: var(--bs-font-serif); font-weight: 400;">{displayName.value}</span>.{:else}!{/if}
-			</h2>
-			<p
-				class="mt-2.5 max-w-[520px]"
-				style="font-size: 13px; line-height: 1.5; letter-spacing: -0.005em; color: var(--bs-text-2);"
-			>
-				{#if inc.value > 0}
-					{#if projectedSavings >= 0}
-						You're on pace to save
-						<span class="bs-mono" style="color: var(--bs-pos); font-weight: 600;">{money(projectedSavings)}</span>
-						this month
-						{#if Math.abs(paceDelta) > 1 && prevSaved !== 0}
-							— <span style="color: var(--bs-text);">{paceDelta >= 0 ? `${paceDelta.toFixed(0)}% ahead` : `${Math.abs(paceDelta).toFixed(0)}% behind`}</span> of {monthLabel(prevMonth)}.
-						{:else}
-							.
-						{/if}
-					{:else}
-						You're trending
-						<span class="bs-mono" style="color: var(--bs-neg); font-weight: 600;">{money(Math.abs(projectedSavings))} short</span>
-						this month — time to revisit the budget.
+<!-- Hero — auto-staggered as the 1st child of .bs-tab-content (40ms delay). -->
+<div class="d-card d-card-dark" style="padding: 28px;">
+	<div class="d-hero-glow" aria-hidden="true"></div>
+	<div class="d-hero-grid">
+			<div>
+				<div class="d-hero-greeting">{greeting}, {heroName} · {dateLabel}</div>
+				<div class="d-italic d-hero-nest">Your nest is worth</div>
+				<div class="d-italic d-hero-value">
+					<MoneyUp value={nw.value} duration={1100} />
+				</div>
+				<div class="d-hero-meta">
+					{#if ytdDelta !== 0}
+						<span class="d-italic d-hero-pill">
+							{ytdDelta >= 0 ? '↑' : '↓'} {money0(Math.abs(ytdDelta))} since {prevMonthAbbr}
+						</span>
 					{/if}
-				{:else}
-					Log some income for {monthLabel(month)} and we'll start tracking your savings pace.
-				{/if}
-			</p>
-			<div class="mt-4 flex flex-wrap gap-2">
-				<span
-					class="inline-flex items-center gap-1.5 rounded-full"
-					style="padding: 5px 10px; background: color-mix(in oklch, var(--bs-pos) 14%, transparent); color: var(--bs-pos); font-size: 11.5px; font-weight: 500;"
-				>
-					<Icon name="charts/trend-up" size={12} />
-					{savingsRate >= 10 ? 'Strong savings rate' : 'Building savings'}
-				</span>
-				<span
-					class="inline-flex items-center gap-1.5 rounded-full"
-					style="padding: 5px 10px; background: color-mix(in oklch, var(--bs-accent) 12%, transparent); color: var(--bs-accent); font-size: 11.5px; font-weight: 500;"
-				>
-					<Icon name="general/target-04" size={12} />
-					{accounts.value.length} account{accounts.value.length === 1 ? '' : 's'} tracked
-				</span>
+					{#if accounts.value.length > 0}
+						<span class="d-hero-sub">across {accounts.value.length} account{accounts.value.length === 1 ? '' : 's'}</span>
+					{/if}
+				</div>
+			</div>
+			<div class="d-hero-kpis">
+				<div>
+					<div class="d-hero-kpi-label">{monthAbbr} income</div>
+					<div class="d-italic d-hero-kpi-value" style="color: var(--bs-brand-3);">
+						<MoneyUp value={inc.value} delay={150} />
+					</div>
+					<div class="d-hero-kpi-delta">
+						{#if incPrev.value > 0}
+							{incDelta >= 0 ? '↑' : '↓'} {money0(Math.abs(incDelta))} vs {prevMonthAbbr}
+						{:else}
+							&nbsp;
+						{/if}
+					</div>
+				</div>
+				<div>
+					<div class="d-hero-kpi-label">{monthAbbr} spending</div>
+					<div class="d-italic d-hero-kpi-value">
+						<MoneyUp value={exp.value} delay={240} />
+					</div>
+					<div class="d-hero-kpi-delta">
+						{#if expPrev.value > 0}
+							{expDelta <= 0 ? '↓' : '↑'} {money0(Math.abs(expDelta))} vs {prevMonthAbbr}
+						{:else}
+							&nbsp;
+						{/if}
+					</div>
+				</div>
+				<div>
+					<div class="d-hero-kpi-label">Saved</div>
+					<div
+						class="d-italic d-hero-kpi-value"
+						style="color: {savedThisMonth >= 0 ? 'var(--bs-brand-3)' : 'var(--bs-neg)'};"
+					>
+						<MoneyUp value={savedThisMonth} delay={330} />
+					</div>
+					<div class="d-hero-kpi-delta">{savingsRate.toFixed(0)}% of income</div>
+				</div>
 			</div>
 		</div>
-		<div
-			class="relative shrink-0 hidden md:flex items-center justify-center"
-			style="width: 170px; height: 170px;"
-		>
-			<img
-				src="{base}/logo-hero.png"
-				alt=""
-				aria-hidden="true"
-				class="w-full h-full object-contain"
-				style="filter: drop-shadow(0 6px 16px rgba(40, 30, 12, 0.18));"
-			/>
-		</div>
-	</section>
+</div>
 
-	<!--
-		KPI tiles per design/components.jsx Stat:
-		- 11px / 500 / 0.04em uppercase section label (via .section-label)
-		- 30px / 500 value with -0.025em tracking (via .bs-kpi)
-		- delta tag: tonal background at 12-14% color-mix, 12px text, tabular-nums
-	-->
-	<div class="grid gap-4 sm:grid-cols-3">
-		<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-			<div class="mb-3.5 flex items-center justify-between">
-				<span class="section-label">Income</span>
-				<span class="h-2 w-2 rounded-full" style="background: var(--bs-pos); opacity: 0.7;"></span>
-			</div>
-			<div class="bs-kpi" style="color: var(--bs-pos);">{money(inc.value)}</div>
-			{#if incPrev.value > 0}
-				<div class="mt-2.5 flex items-center gap-2" style="font-size: 12px;">
-					<span
-						class="bs-tag bs-mono"
-						style="background: color-mix(in oklch, {incDelta >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'} 12%, transparent); color: {incDelta >= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'};"
-					>
-						{incDelta >= 0 ? '↑' : '↓'} {money(Math.abs(incDelta))}
-					</span>
-					<span style="color: var(--bs-text-2);">vs. {monthLabel(prevMonth).split(' ')[0]}</span>
+<!-- Sparrow Says — 2nd child, 120ms delay. -->
+<SparrowSays cta="See plan" onclick={() => goto(`${base}/budgets`)}>
+	{@html sparrowText}
+</SparrowSays>
+
+<!-- Net worth chart + Goals/Health stack — 3rd child, 200ms delay. -->
+<div class="d-grid-7-3">
+		<div class="d-card">
+			<div class="d-card-head">
+				<div>
+					<h3 class="d-italic d-card-title">Net worth, year to date</h3>
+					<div class="d-card-sub">{scrubLabel ?? `${networthPoints.length} months`}</div>
 				</div>
-			{/if}
-		</div>
-		<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-			<div class="mb-3.5 flex items-center justify-between">
-				<span class="section-label">Spending</span>
-				<span class="h-2 w-2 rounded-full" style="background: var(--bs-neg); opacity: 0.7;"></span>
-			</div>
-			<div class="bs-kpi">{money(exp.value)}</div>
-			{#if expPrev.value > 0}
-				<div class="mt-2.5 flex items-center gap-2" style="font-size: 12px;">
-					<span
-						class="bs-tag bs-mono"
-						style="background: color-mix(in oklch, {expDelta <= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'} 12%, transparent); color: {expDelta <= 0 ? 'var(--bs-pos)' : 'var(--bs-neg)'};"
-					>
-						{expDelta <= 0 ? '↓' : '↑'} {money(Math.abs(expDelta))}
-					</span>
-					<span style="color: var(--bs-text-2);">vs. {monthLabel(prevMonth).split(' ')[0]}</span>
+				<div class="d-range-pill">
+					{#each ['1M', '3M', 'YTD', '1Y'] as r (r)}
+						<button
+							type="button"
+							class="d-range-chip"
+							class:active={nwRange === r}
+							onclick={() => (nwRange = r as Range)}
+						>{r}</button>
+					{/each}
 				</div>
-			{/if}
+			</div>
+			<NetWorthChart points={networthPoints} height={220} onScrub={handleScrub} />
 		</div>
-		<div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-			<div class="mb-3.5 flex items-center justify-between">
-				<span class="section-label">Financial health</span>
-				<span
-					class="bs-tag"
-					style="background: color-mix(in oklch, var(--bs-pos) 12%, transparent); color: var(--bs-pos);"
-				>
-					{healthLabel}
-				</span>
+
+		<div class="d-stack">
+			<div class="d-card d-card-dark" style="flex: 1;">
+				<div class="d-card-head" style="margin-bottom: 10px;">
+					<span class="d-card-eyebrow">Goals on track</span>
+					<span class="d-card-eyebrow">{onTrackCount} of {totalGoals}</span>
+				</div>
+				<div class="d-italic d-card-display">
+					{onTrackCount}<span class="d-card-display-sub"> / {totalGoals}</span>
+				</div>
+				{#if totalGoals === 0}
+					<p class="d-card-empty">No goals yet — <a href="{base}/goals" class="d-link">set one</a>.</p>
+				{:else}
+					{#each goalRows.value.slice(0, 2) as row, i (row.goal.id)}
+						<div class="d-goal-row">
+							<div class="d-goal-row-head">
+								<span>{row.goal.name}</span>
+								<span class="d-italic" style="color: var(--bs-panel-tx-2, rgba(232,224,204,0.66));">{row.pct.toFixed(0)}%</span>
+							</div>
+							<Bar
+								value={row.current}
+								max={row.goal.targetAmount}
+								color="var(--bs-brand-3)"
+								track="rgba(232,224,204,0.13)"
+								delay={500 + i * 90}
+							/>
+						</div>
+					{/each}
+				{/if}
 			</div>
-			<div class="flex items-baseline gap-2">
-				<span class="bs-kpi">{healthScore}</span>
-				<span class="bs-mono" style="font-size: 14px; color: var(--bs-text-3);">/100</span>
+			<div class="d-card d-card-accent" style="flex: 1;">
+				<div class="d-card-eyebrow" style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">Health score</div>
+				<div class="d-italic d-card-display" style="color: #fff;">
+					{healthScore}<span class="d-card-display-sub" style="opacity: 0.7;"> / 100</span>
+				</div>
+				<div class="d-card-body" style="color: rgba(255,255,255,0.85);">
+					{#if inc.value > 0}
+						{savedThisMonth >= 0 ? `Saving ${savingsRate.toFixed(0)}% of income` : 'Overspending'} — your {healthScore >= 80 ? 'best' : healthScore >= 60 ? 'solid' : 'tight'} ratio this month.
+					{:else}
+						Log income to start scoring your savings ratio.
+					{/if}
+				</div>
 			</div>
-			<div
-				class="mt-3 h-1 w-full overflow-hidden rounded-full"
-				style="background: color-mix(in oklch, var(--bs-text-3) 18%, transparent);"
-			>
-				<div
-					class="h-full rounded-full transition-all"
-					style="width: {Math.max(2, Math.min(100, healthScore))}%; background: var(--bs-pos);"
-				></div>
+		</div>
+</div>
+
+<!-- Where money went + Recent activity — 4th child, 280ms delay. -->
+<div class="d-grid-1-1">
+		<a href="{base}/budgets" class="d-card d-card-link">
+			<div class="d-card-head">
+				<h3 class="d-italic d-card-title">Where money went</h3>
+				<span class="d-card-sub-inline">{monthLabel(month)}</span>
 			</div>
-			<div class="mt-2.5" style="font-size: 12px; color: var(--bs-text-2);">
+			<div class="d-spend-headline">
+				<span class="d-italic d-spend-amount">{money0(exp.value)}</span>
 				{#if inc.value > 0}
-					{savedThisMonth >= 0 ? 'Saved' : 'Overspent'} <span class="bs-mono" style="color: var(--bs-text);">{money(Math.abs(savedThisMonth))}</span> this month
-				{:else}
-					Log some income to see your savings rate
+					<span class="d-spend-of">of {money0(inc.value)} earned</span>
 				{/if}
 			</div>
-		</div>
-	</div>
-
-	<!-- Net worth over the year -->
-	<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-		<NetWorthChart points={networthPoints} />
-	</section>
-
-	<div class="grid gap-6 lg:grid-cols-2">
-		<!-- Spending donut -->
-		<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="mb-4 flex items-baseline justify-between">
-				<div>
-					<h2 class="text-base font-semibold" style="color: var(--bs-text);">Where money went</h2>
-					<p class="text-xs" style="color: var(--bs-text-2);">{monthLabel(month)}</p>
-				</div>
-				<a
-					href="{base}/budgets"
-					class="text-sm transition-opacity hover:opacity-80"
-					style="color: var(--bs-brand);"
-				>
-					All →
-				</a>
+			<div style="margin-bottom: 16px;">
+				<StackBar
+					slices={topSlices.map((s) => ({ value: Math.max(1, s.value), color: s.color, label: s.label }))}
+					delay={500}
+				/>
 			</div>
-			<Donut slices={slices} centerLabel="spent" centerValue={money(exp.value)} />
-		</section>
-
-		<!-- Recent transactions -->
-		<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-			<div class="mb-4 flex items-baseline justify-between">
-				<div>
-					<h2 class="text-base font-semibold" style="color: var(--bs-text);">Recent transactions</h2>
-					<p class="text-xs" style="color: var(--bs-text-2);">Last 7 days</p>
+			{#if legendSlices.length === 0}
+				<p class="d-card-empty">No spending yet this month.</p>
+			{:else}
+				<div class="d-spend-legend">
+					{#each legendSlices as s, i (i)}
+						<div class="d-spend-legend-row">
+							<span class="d-spend-dot" style="background: {s.color};"></span>
+							<span class="d-spend-legend-label">{s.label}</span>
+							<span class="d-italic" style="font-size: 14px; color: var(--bs-text-2);">{money0(s.value)}</span>
+						</div>
+					{/each}
 				</div>
-				<a
-					href="{base}/transactions"
-					class="text-sm transition-opacity hover:opacity-80"
-					style="color: var(--bs-brand);"
-				>
-					View all →
-				</a>
+			{/if}
+		</a>
+
+		<a href="{base}/transactions" class="d-card d-card-link" style="padding: 0;">
+			<div class="d-card-head" style="padding: 22px 22px 12px; margin-bottom: 0;">
+				<h3 class="d-italic d-card-title">Recent activity</h3>
+				<span class="d-link">All →</span>
 			</div>
 			{#if recent.value.length === 0}
-				<p class="py-6 text-center text-sm" style="color: var(--bs-text-2);">Nothing logged yet.</p>
+				<p class="d-card-empty" style="padding: 0 22px 22px;">Nothing logged yet.</p>
 			{:else}
-				<ul class="divide-y" style="border-color: var(--bs-border);">
-					{#each recent.value as t (t.id)}
-						{@const c = t.categoryId != null ? catMap.get(t.categoryId) : null}
-						<li class="flex items-center gap-3 py-2.5">
-							<div
-								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm"
-								style="background:{c?.color ?? '#94a3b8'}22;color:{c?.color ?? '#475569'}"
-							>
-								{#if c?.icon}<Icon name={c.icon} size={18} />{:else}<span>·</span>{/if}
-							</div>
-							<div class="min-w-0 flex-1">
-								<div class="truncate text-sm font-medium" style="color: var(--bs-text);">{t.payee || c?.name || 'Transaction'}</div>
-								<div class="text-xs" style="color: var(--bs-text-3);">
-									{formatDate(t.date)} · {accountMap.get(t.accountId)?.name ?? '?'}
-								</div>
-							</div>
-							<div class="shrink-0 text-sm font-semibold tabular-nums" style="color: {t.amount > 0 ? 'var(--bs-pos)' : 'var(--bs-text)'};">
-								{money(t.amount)}
-							</div>
-						</li>
-					{/each}
-				</ul>
+				{#each recent.value as t (t.id)}
+					{@const c = t.categoryId != null ? catMap.get(t.categoryId) : null}
+					{@const pos = t.amount > 0}
+					<div class="d-recent-row">
+						<BrandMark name={t.payee || c?.name || 'Transaction'} size={34} radius={12} />
+						<div class="d-recent-body">
+							<div class="d-recent-name">{t.payee || c?.name || 'Transaction'}</div>
+							<div class="d-recent-sub">{friendlyDate(t.date)}</div>
+						</div>
+						<span class="d-italic d-recent-amount" style="color: {pos ? 'var(--bs-pos)' : 'var(--bs-text)'};">
+							{pos ? '+' : '−'}{money(Math.abs(t.amount))}
+						</span>
+					</div>
+				{/each}
 			{/if}
-		</section>
-	</div>
-
+		</a>
 </div>
 
 <style>
-	/*
-	 * Greeting hero — soft brand→accent gradient backdrop. Keeps the warm
-	 * jungle feel while remaining airy enough to set off the dark title text.
-	 * In dark mode the gradient is much darker so it doesn't blow out.
-	 */
-	.bs-hero {
-		background:
-			linear-gradient(
-				135deg,
-				color-mix(in oklch, var(--bs-brand) 14%, var(--bs-surface)) 0%,
-				color-mix(in oklch, var(--bs-accent) 12%, var(--bs-surface)) 60%,
-				color-mix(in oklch, var(--bs-brand-tint, var(--bs-surface)) 100%, transparent) 100%
-			);
-		box-shadow: var(--bs-shadow);
+	/* ── Italic-Fraunces tabular numerals (iNum from desktop.jsx) ────── */
+	.d-italic {
+		font-family: var(--bs-font-serif);
+		font-style: italic;
+		font-variant-numeric: tabular-nums;
+		font-weight: 400;
 	}
-	:global(.dark) .bs-hero {
-		background: linear-gradient(
-			135deg,
-			color-mix(in oklch, var(--bs-brand) 22%, var(--bs-surface)) 0%,
-			color-mix(in oklch, var(--bs-accent) 20%, var(--bs-surface)) 100%
-		);
+
+	/* ── Card primitive (DCard from desktop.jsx) ──────────────────────── */
+	.d-card {
+		border-radius: 20px;
+		padding: 22px;
+		position: relative;
+		overflow: hidden;
+		background: var(--bs-surface);
+		color: var(--bs-text);
+		box-shadow: 0 1px 2px rgba(26, 20, 8, 0.04), 0 6px 20px rgba(26, 20, 8, 0.05);
+		display: block;
+		text-decoration: none;
+	}
+	.d-card-dark {
+		background: var(--bs-panel, #1a2118);
+		color: var(--bs-panel-tx, #e8e0cc);
+		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18), 0 18px 40px rgba(0, 0, 0, 0.16);
+	}
+	.d-card-accent {
+		background: var(--bs-accent);
+		color: #fff;
+		box-shadow: 0 8px 24px rgba(176, 120, 66, 0.26);
+	}
+	.d-card-link {
+		cursor: pointer;
+		transition: transform 140ms cubic-bezier(.3, .7, .4, 1);
+	}
+	.d-card-link:hover {
+		transform: translateY(-1px);
+	}
+	.d-card-link:active {
+		transform: scale(0.99);
+	}
+
+	/* ── Hero ─────────────────────────────────────────────────────────── */
+	.d-hero-glow {
+		position: absolute;
+		top: -140px;
+		right: -40px;
+		width: 360px;
+		height: 360px;
+		border-radius: 50%;
+		background: rgba(176, 120, 66, 0.16);
+		pointer-events: none;
+	}
+	.d-hero-grid {
+		position: relative;
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 32px;
+		flex-wrap: wrap;
+	}
+	.d-hero-greeting {
+		font-size: 13px;
+		color: var(--bs-panel-tx-2, rgba(232, 224, 204, 0.66));
+		margin-bottom: 6px;
+	}
+	.d-hero-nest {
+		font-weight: 300;
+		font-size: 15px;
+		color: var(--bs-panel-tx-2, rgba(232, 224, 204, 0.66));
+	}
+	.d-hero-value {
+		font-weight: 400;
+		font-size: 76px;
+		line-height: 1;
+		color: var(--bs-panel-tx, #e8e0cc);
+		letter-spacing: -0.035em;
+		margin-top: 2px;
+	}
+	.d-hero-meta {
+		margin-top: 14px;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.d-hero-pill {
+		padding: 5px 12px;
+		border-radius: 999px;
+		font-size: 13px;
+		background: color-mix(in oklch, var(--bs-brand-3) 22%, transparent);
+		color: var(--bs-brand-3);
+	}
+	.d-hero-sub {
+		font-size: 13px;
+		color: var(--bs-panel-tx-2, rgba(232, 224, 204, 0.66));
+	}
+	.d-hero-kpis {
+		display: flex;
+		gap: 36px;
+		padding-left: 32px;
+		border-left: 1px solid var(--bs-panel-line, rgba(232, 224, 204, 0.12));
+	}
+	.d-hero-kpi-label {
+		font-size: 11.5px;
+		color: var(--bs-panel-tx-2, rgba(232, 224, 204, 0.66));
+		margin-bottom: 6px;
+	}
+	.d-hero-kpi-value {
+		font-size: 30px;
+		line-height: 1;
+		color: var(--bs-panel-tx, #e8e0cc);
+	}
+	.d-hero-kpi-delta {
+		font-size: 11px;
+		color: var(--bs-panel-tx-3, rgba(232, 224, 204, 0.42));
+		margin-top: 5px;
+	}
+
+	/* On narrow viewports drop the vertical separator and stack KPIs under. */
+	@media (max-width: 900px) {
+		.d-hero-kpis {
+			padding-left: 0;
+			border-left: none;
+			width: 100%;
+			justify-content: space-between;
+			gap: 16px;
+		}
+		.d-hero-value {
+			font-size: 56px;
+		}
+	}
+	@media (max-width: 480px) {
+		.d-card[style*='padding: 28px'] {
+			padding: 20px !important;
+		}
+		.d-hero-value {
+			font-size: 44px;
+		}
+		.d-hero-kpis {
+			gap: 12px;
+		}
+		.d-hero-kpi-value {
+			font-size: 22px;
+		}
+		.d-hero-kpi-label,
+		.d-hero-kpi-delta {
+			font-size: 10.5px;
+		}
+		.d-spend-legend {
+			grid-template-columns: 1fr;
+			gap: 6px;
+		}
+		.d-spend-amount {
+			font-size: 28px;
+		}
+		.d-card-display {
+			font-size: 34px;
+		}
+		.d-recent-row {
+			padding: 10px 18px;
+		}
+	}
+
+	/* ── Card head ────────────────────────────────────────────────────── */
+	.d-card-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 12px;
+		margin-bottom: 6px;
+		flex-wrap: wrap;
+	}
+	.d-card-title {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 400;
+		color: inherit;
+	}
+	.d-card-sub {
+		font-size: 12px;
+		color: var(--bs-text-3);
+		margin-top: 2px;
+	}
+	.d-card-sub-inline {
+		font-size: 12px;
+		color: var(--bs-text-3);
+	}
+	.d-card-eyebrow {
+		font-size: 12px;
+		color: var(--bs-panel-tx-2, rgba(232, 224, 204, 0.66));
+	}
+	.d-card-display {
+		font-size: 40px;
+		line-height: 1;
+		color: var(--bs-panel-tx, #e8e0cc);
+		margin: 14px 0 12px;
+	}
+	.d-card-display-sub {
+		font-size: 18px;
+		color: var(--bs-panel-tx-2, rgba(232, 224, 204, 0.66));
+	}
+	.d-card-body {
+		font-size: 12px;
+		margin-top: 10px;
+		line-height: 1.4;
+	}
+	.d-card-empty {
+		margin: 0;
+		padding: 14px 0;
+		font-size: 13px;
+		color: var(--bs-text-3);
+		text-align: center;
+	}
+
+	/* ── Range pill (inset on bg3, active lifts to surface) ──────────── */
+	.d-range-pill {
+		display: flex;
+		gap: 2px;
+		padding: 3px;
+		background: var(--bs-bg-2);
+		border-radius: 999px;
+	}
+	.d-range-chip {
+		padding: 5px 12px;
+		border-radius: 999px;
+		font-size: 11.5px;
+		font-weight: 500;
+		background: transparent;
+		color: var(--bs-text-3);
+		border: none;
+		cursor: pointer;
+		transition: background 160ms, color 160ms;
+	}
+	.d-range-chip.active {
+		background: var(--bs-surface);
+		color: var(--bs-text);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	}
+
+	/* ── Grids ────────────────────────────────────────────────────────── */
+	.d-grid-7-3 {
+		display: grid;
+		grid-template-columns: 1.7fr 1fr;
+		gap: 16px;
+	}
+	.d-grid-1-1 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+	}
+	.d-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	@media (max-width: 1100px) {
+		.d-grid-7-3 {
+			grid-template-columns: 1fr;
+		}
+	}
+	@media (max-width: 900px) {
+		.d-grid-1-1 {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	/* ── Goals row ────────────────────────────────────────────────────── */
+	.d-goal-row {
+		margin-bottom: 10px;
+	}
+	.d-goal-row:last-child {
+		margin-bottom: 0;
+	}
+	.d-goal-row-head {
+		display: flex;
+		justify-content: space-between;
+		margin-bottom: 5px;
+		font-size: 12.5px;
+		color: var(--bs-panel-tx, #e8e0cc);
+	}
+
+	/* ── Where money went ─────────────────────────────────────────────── */
+	.d-spend-headline {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
+		margin-bottom: 14px;
+	}
+	.d-spend-amount {
+		font-size: 34px;
+		line-height: 1;
+		color: var(--bs-text);
+	}
+	.d-spend-of {
+		font-size: 12.5px;
+		color: var(--bs-text-3);
+	}
+	.d-spend-legend {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px 24px;
+	}
+	.d-spend-legend-row {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		min-width: 0;
+	}
+	.d-spend-dot {
+		width: 9px;
+		height: 9px;
+		border-radius: 3px;
+		flex-shrink: 0;
+	}
+	.d-spend-legend-label {
+		flex: 1;
+		min-width: 0;
+		font-size: 12.5px;
+		color: var(--bs-text);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* ── Recent activity ──────────────────────────────────────────────── */
+	.d-recent-row {
+		display: flex;
+		align-items: center;
+		gap: 11px;
+		padding: 10px 22px;
+		border-top: 1px solid var(--bs-border);
+	}
+	.d-recent-body {
+		flex: 1;
+		min-width: 0;
+	}
+	.d-recent-name {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--bs-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.d-recent-sub {
+		font-size: 11px;
+		color: var(--bs-text-3);
+	}
+	.d-recent-amount {
+		font-size: 14.5px;
+		flex-shrink: 0;
+	}
+
+	/* ── Brass accent link ────────────────────────────────────────────── */
+	.d-link {
+		color: var(--bs-accent);
+		font-size: 12px;
+		font-weight: 500;
+		text-decoration: none;
+	}
+	.d-link:hover {
+		text-decoration: underline;
 	}
 </style>
