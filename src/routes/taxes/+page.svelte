@@ -677,9 +677,8 @@
 	{/snippet}
 </ScreenTitle>
 
-<div class="space-y-6 p-4 md:p-8">
-	<!-- Ready-to-file accordion (document checklist + refund estimator) -->
-	<section class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+<!-- Ready-to-file accordion (document checklist + refund estimator) -->
+<section class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
 		<!-- Accordion header -->
 		<button
 			class="flex w-full items-center justify-between gap-3 p-5 text-left"
@@ -1396,7 +1395,6 @@
 			<span class="font-semibold">Heads up:</span> The figures on this page are estimates based on how your transactions are categorized — they're a helpful starting point, not a guarantee. IRS definitions can be nuanced, and not every transaction that looks like a deduction will qualify. Review each amount against your actual receipts and statements, apply your own judgment, and consult a tax professional if you're unsure.
 		</div>
 	</section>
-</div>
 
 <!-- Mileage quick-add modal -->
 {#if showMileageForm}

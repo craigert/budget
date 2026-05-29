@@ -126,8 +126,7 @@
 	{/snippet}
 </ScreenTitle>
 
-<div class="space-y-6 p-4 md:p-8">
-	{#if visible.length === 0}
+{#if visible.length === 0}
 		<div class="rounded-xl p-10 text-center" style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);">
 			<p style="color: var(--bs-text-2);">No accounts yet. Add one to start tracking.</p>
 			<div class="mt-4">
@@ -241,7 +240,6 @@
 			</ul>
 		</details>
 	{/if}
-</div>
 
 <Modal open={showModal} title={editing ? 'Edit account' : 'New account'} onclose={() => (showModal = false)}>
 	<form id="account-form" onsubmit={save} class="space-y-4">
