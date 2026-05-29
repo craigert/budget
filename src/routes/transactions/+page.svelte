@@ -111,6 +111,43 @@
 	const shown = $derived(filtered.slice(0, visibleCount));
 	const totalShown = $derived(filtered.reduce((sum, t) => sum + t.amount, 0));
 
+	/* Mobile-only: group the shown list by relative date label so we can
+	   render Today / Yesterday / "May 24" / Earlier sections per the design
+	   screenshot. Same source data, just bucketed. */
+	function dateBucket(iso: string): { sort: string; label: string } {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const [y, m, d] = iso.split('-').map(Number);
+		const tx = new Date(y, m - 1, d);
+		const diffDays = Math.round((today.getTime() - tx.getTime()) / 86400000);
+		if (diffDays === 0) return { sort: '0', label: 'Today' };
+		if (diffDays === 1) return { sort: '1', label: 'Yesterday' };
+		if (diffDays > 1 && diffDays < 30) {
+			return {
+				sort: '2-' + String(99999999 - tx.getTime()).padStart(20, '0'),
+				label: tx.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+			};
+		}
+		return { sort: '9', label: 'Earlier' };
+	}
+
+	const groupedShown = $derived.by(() => {
+		const map = new Map<string, { label: string; items: Transaction[] }>();
+		for (const t of shown) {
+			const { sort, label } = dateBucket(t.date);
+			if (!map.has(sort)) map.set(sort, { label, items: [] });
+			map.get(sort)!.items.push(t);
+		}
+		return Array.from(map.entries())
+			.sort((a, b) => a[0].localeCompare(b[0]))
+			.map(([, g]) => g);
+	});
+
+	function initial(name: string): string {
+		const c = (name || '?').trim().charAt(0).toUpperCase();
+		return c || '?';
+	}
+
 	function resetFilters() {
 		q = '';
 		accountFilter = '';
@@ -400,7 +437,7 @@
 
 <ScreenTitle
 	title="Transactions"
-	eyebrow={`All accounts · ${monthLabel(now)} · ${filtered.length} shown`}
+	eyebrow={`All accounts · ${monthLabel(now).split(' ')[0]}`}
 >
 	{#snippet actions()}
 		<button
@@ -414,6 +451,18 @@
 		<Button variant="onbrand" onclick={openCreate} disabled={accounts.value.length === 0}>+ Transaction</Button>
 	{/snippet}
 </ScreenTitle>
+
+<!-- Mobile-only search bar. Desktop has the same search reachable from
+     the TopNav, so we don't duplicate it there. -->
+<label class="bs-tx-search-mobile">
+	<Icon name="general/search-md" size={15} />
+	<input
+		type="search"
+		bind:value={q}
+		placeholder="Search transactions"
+		aria-label="Search transactions"
+	/>
+</label>
 
 <!-- Sign filter pills — the headline filter from the design's DTransactions.
      Each section below is a direct child of the layout's .bs-tab-content so
@@ -539,11 +588,54 @@
 			{/if}
 		</div>
 	{:else}
-		<!-- DTransactions-style table card: header row + grouped rows. Each row
-		     uses the merchant brand mark from BrandMark, category icon chip,
-		     italic-Fraunces amount aligned right. Click to open the existing
-		     edit modal so all the legacy add/edit/business/receipt logic stays
-		     functional underneath. -->
+		<!-- Mobile (<768): grouped-by-date cards per the design screenshot.
+		     Each bucket (Today / Yesterday / "May 24" / Earlier) gets its
+		     own white card with a small italic Fraunces header above. Soft
+		     category-color monogram chips instead of the brand-color BrandMark. -->
+		<div class="bs-tx-groups">
+			{#each groupedShown as g (g.label)}
+				<section class="bs-tx-group">
+					<h2 class="bs-tx-group-label">{g.label}</h2>
+					<ul class="bs-tx-group-card">
+						{#each g.items as t (t.id)}
+							{@const cat = t.categoryId != null ? categoryMap.get(t.categoryId) : null}
+							{@const color = cat?.color ?? 'var(--bs-text-3)'}
+							{@const pos = t.amount > 0}
+							<li data-tx-id={t.id} class="bs-tx-mobile-li">
+								<button
+									type="button"
+									class="bs-tx-mobile-row"
+									onclick={() => openEdit(t)}
+									aria-label="Edit transaction"
+								>
+									<span
+										class="bs-tx-mobile-chip"
+										style="background: color-mix(in oklch, {color} 16%, transparent); color: {color};"
+									>{initial(t.payee || cat?.name || '')}</span>
+									<div class="bs-tx-mobile-text">
+										<div class="bs-tx-mobile-name">{t.payee || '(no payee)'}</div>
+										<div class="bs-tx-mobile-sub">
+											{cat?.name ?? 'Uncategorized'} · {formatDate(t.date)}
+										</div>
+									</div>
+									<span
+										class="bs-tx-mobile-amount"
+										style="color: {pos ? 'var(--bs-pos)' : 'var(--bs-text)'};"
+									>
+										{pos ? '+' : '−'}{money(Math.abs(t.amount))}
+									</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/each}
+		</div>
+
+		<!-- Desktop (>=768): table card. Each row uses the merchant brand mark
+		     from BrandMark, category icon chip, italic-Fraunces amount aligned
+		     right. Click to open the existing edit modal so all the legacy
+		     add/edit/business/receipt logic stays functional underneath. -->
 		<div class="bs-tx-card">
 			<div class="bs-tx-header">
 				<span>Merchant</span>
@@ -782,6 +874,135 @@
 	:global(.bs-screen-action:hover) {
 		background: var(--bs-surface-2);
 		color: var(--bs-text);
+	}
+
+	/* ── Mobile search bar (matches the screenshot's full-width pill) ─── */
+	.bs-tx-search-mobile {
+		display: none;
+		align-items: center;
+		gap: 10px;
+		padding: 11px 16px;
+		background: var(--bs-surface);
+		border: 1px solid var(--bs-border);
+		border-radius: 999px;
+		color: var(--bs-text-3);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	}
+	.bs-tx-search-mobile input {
+		flex: 1;
+		min-width: 0;
+		background: transparent;
+		border: none;
+		outline: none;
+		color: var(--bs-text);
+		font-family: var(--bs-font-sans);
+		font-size: 14px;
+		padding: 0;
+		box-shadow: none;
+		border-radius: 0;
+	}
+	.bs-tx-search-mobile input::placeholder {
+		color: var(--bs-text-3);
+	}
+	@media (max-width: 767px) {
+		.bs-tx-search-mobile {
+			display: flex;
+		}
+	}
+
+	/* ── Mobile grouped layout (Today / Yesterday / May 24 / Earlier) ─── */
+	.bs-tx-groups {
+		display: none;
+		flex-direction: column;
+		gap: 18px;
+	}
+	.bs-tx-group {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.bs-tx-group-label {
+		margin: 0 4px;
+		font-family: var(--bs-font-serif);
+		font-style: italic;
+		font-weight: 400;
+		font-size: 16px;
+		color: var(--bs-text);
+		letter-spacing: -0.005em;
+	}
+	.bs-tx-group-card {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--bs-surface);
+		border-radius: 18px;
+		overflow: hidden;
+		box-shadow: 0 1px 2px rgba(26, 20, 8, 0.04), 0 6px 18px rgba(26, 20, 8, 0.05);
+	}
+	.bs-tx-mobile-li + .bs-tx-mobile-li {
+		border-top: 1px solid var(--bs-border);
+	}
+	.bs-tx-mobile-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		width: 100%;
+		padding: 12px 14px;
+		background: transparent;
+		border: none;
+		text-align: left;
+		transition: background 120ms ease;
+	}
+	.bs-tx-mobile-row:hover {
+		background: color-mix(in oklch, var(--bs-text) 3%, var(--bs-surface));
+	}
+	.bs-tx-mobile-chip {
+		flex-shrink: 0;
+		width: 38px;
+		height: 38px;
+		border-radius: 10px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-family: var(--bs-font-sans);
+		font-weight: 600;
+		font-size: 15px;
+		letter-spacing: -0.02em;
+	}
+	.bs-tx-mobile-text {
+		flex: 1;
+		min-width: 0;
+	}
+	.bs-tx-mobile-name {
+		font-size: 14.5px;
+		font-weight: 600;
+		color: var(--bs-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.bs-tx-mobile-sub {
+		font-size: 12px;
+		color: var(--bs-text-3);
+		margin-top: 2px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.bs-tx-mobile-amount {
+		flex-shrink: 0;
+		font-family: var(--bs-font-serif);
+		font-style: italic;
+		font-size: 16px;
+		font-variant-numeric: tabular-nums;
+	}
+	@media (max-width: 767px) {
+		.bs-tx-groups {
+			display: flex;
+		}
+		.bs-tx-card {
+			display: none;
+		}
 	}
 
 	/* ── Table card ──────────────────────────────────────────────────── */
