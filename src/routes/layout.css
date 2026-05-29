@@ -92,7 +92,12 @@
 
 html,
 body {
-	height: 100%;
+	/* min-height (not height: 100%) so body grows with content. With
+	   height: 100% body is clamped to exactly 100vh, which truncates the
+	   sticky-containing-block for TopNav and makes it visibly scroll away
+	   once you pass that point. min-height lets it stay pinned at top
+	   for the entire page scroll. */
+	min-height: 100%;
 }
 
 body {
