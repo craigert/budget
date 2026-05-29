@@ -113,34 +113,32 @@
 
 	/* Mobile-only: group the shown list by relative date label so we can
 	   render Today / Yesterday / "May 24" / Earlier sections per the design
-	   screenshot. Same source data, just bucketed. */
-	function dateBucket(iso: string): { sort: string; label: string } {
+	   screenshot. `shown` is already sorted date DESC (newest first) by the
+	   base Dexie query, so we just key the Map by label and let insertion
+	   order drive section order — Today appears first when present, then
+	   Yesterday, then the most recent specific date, etc. */
+	function dateBucketLabel(iso: string): string {
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
 		const [y, m, d] = iso.split('-').map(Number);
 		const tx = new Date(y, m - 1, d);
 		const diffDays = Math.round((today.getTime() - tx.getTime()) / 86400000);
-		if (diffDays === 0) return { sort: '0', label: 'Today' };
-		if (diffDays === 1) return { sort: '1', label: 'Yesterday' };
+		if (diffDays === 0) return 'Today';
+		if (diffDays === 1) return 'Yesterday';
 		if (diffDays > 1 && diffDays < 30) {
-			return {
-				sort: '2-' + String(99999999 - tx.getTime()).padStart(20, '0'),
-				label: tx.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-			};
+			return tx.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 		}
-		return { sort: '9', label: 'Earlier' };
+		return 'Earlier';
 	}
 
 	const groupedShown = $derived.by(() => {
 		const map = new Map<string, { label: string; items: Transaction[] }>();
 		for (const t of shown) {
-			const { sort, label } = dateBucket(t.date);
-			if (!map.has(sort)) map.set(sort, { label, items: [] });
-			map.get(sort)!.items.push(t);
+			const label = dateBucketLabel(t.date);
+			if (!map.has(label)) map.set(label, { label, items: [] });
+			map.get(label)!.items.push(t);
 		}
-		return Array.from(map.entries())
-			.sort((a, b) => a[0].localeCompare(b[0]))
-			.map(([, g]) => g);
+		return Array.from(map.values());
 	});
 
 	function initial(name: string): string {
@@ -601,6 +599,7 @@
 							{@const cat = t.categoryId != null ? categoryMap.get(t.categoryId) : null}
 							{@const color = cat?.color ?? 'var(--bs-text-3)'}
 							{@const pos = t.amount > 0}
+							{@const biz = t.businessId != null ? businessMap.get(t.businessId) : null}
 							<li data-tx-id={t.id} class="bs-tx-mobile-li">
 								<button
 									type="button"
@@ -608,22 +607,33 @@
 									onclick={() => openEdit(t)}
 									aria-label="Edit transaction"
 								>
-									<span
-										class="bs-tx-mobile-chip"
-										style="background: color-mix(in oklch, {color} 16%, transparent); color: {color};"
-									>{initial(t.payee || cat?.name || '')}</span>
-									<div class="bs-tx-mobile-text">
-										<div class="bs-tx-mobile-name">{t.payee || '(no payee)'}</div>
-										<div class="bs-tx-mobile-sub">
-											{cat?.name ?? 'Uncategorized'} · {formatDate(t.date)}
+									<div class="bs-tx-mobile-main">
+										<span
+											class="bs-tx-mobile-chip"
+											style="background: color-mix(in oklch, {color} 16%, transparent); color: {color};"
+										>{initial(t.payee || cat?.name || '')}</span>
+										<div class="bs-tx-mobile-text">
+											<div class="bs-tx-mobile-name">{t.payee || '(no payee)'}</div>
+											<div class="bs-tx-mobile-sub">
+												{cat?.name ?? 'Uncategorized'} · {formatDate(t.date)}
+											</div>
 										</div>
+										<span
+											class="bs-tx-mobile-amount"
+											style="color: {pos ? 'var(--bs-pos)' : 'var(--bs-text)'};"
+										>
+											{pos ? '+' : '−'}{money(Math.abs(t.amount))}
+										</span>
 									</div>
-									<span
-										class="bs-tx-mobile-amount"
-										style="color: {pos ? 'var(--bs-pos)' : 'var(--bs-text)'};"
-									>
-										{pos ? '+' : '−'}{money(Math.abs(t.amount))}
-									</span>
+									{#if biz}
+										<span
+											class="bs-tx-mobile-biz"
+											style="background: color-mix(in oklch, {biz.color} 18%, transparent); color: {biz.color};"
+										>
+											<Icon name={biz.icon} size={10} />
+											{biz.name}
+										</span>
+									{/if}
 								</button>
 							</li>
 						{/each}
@@ -944,8 +954,8 @@
 	}
 	.bs-tx-mobile-row {
 		display: flex;
-		align-items: center;
-		gap: 12px;
+		flex-direction: column;
+		gap: 6px;
 		width: 100%;
 		padding: 12px 14px;
 		background: transparent;
@@ -955,6 +965,25 @@
 	}
 	.bs-tx-mobile-row:hover {
 		background: color-mix(in oklch, var(--bs-text) 3%, var(--bs-surface));
+	}
+	.bs-tx-mobile-main {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		width: 100%;
+	}
+	.bs-tx-mobile-biz {
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 2px 8px;
+		border-radius: 999px;
+		font-size: 10.5px;
+		font-weight: 500;
+		/* Indent past the chip (38px) + gap (12px) so it aligns with the
+		   merchant name above. */
+		margin-left: 50px;
 	}
 	.bs-tx-mobile-chip {
 		flex-shrink: 0;
