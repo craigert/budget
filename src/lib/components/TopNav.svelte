@@ -290,22 +290,15 @@
 		text-decoration: none;
 	}
 
-	/* ── Tablet / medium-screen layout (768 → 1100) ───────────────────
-	   At these widths the full "icon + label" pill nav and 200px search
-	   input overflow the bar. Drop pill labels (icons-only) and collapse
-	   the search into a small round icon-button matching the dark/avatar
-	   circles. Pill nav stays visible so users can still navigate from
-	   the top — Tailwind's md: breakpoint hides the bottom nav at
-	   ≥768px, so the top nav takes over from there.
-	   At ≥1100px the full label layout returns. */
+	/* ── Tablet / medium-screen layout (768 → 1099) ───────────────────
+	   Two-tier collapse:
+	   - 1000-1099: collapse the 200px search input into a circular icon
+	     button. Pill labels still fit at these widths now the tweaks gear
+	     is gone, so the nav stays human-readable.
+	   - 768-999: even with the search collapsed, 5 labeled pills + the
+	     right-side icons no longer fit; drop pill labels too.
+	   At ≥1100px the full label + search layout returns. */
 	@media (max-width: 1099px) and (min-width: 768px) {
-		.bs-pill-label {
-			display: none;
-		}
-		.bs-pill {
-			padding: 8px 10px;
-			gap: 0;
-		}
 		.bs-topnav-search-label {
 			display: none;
 		}
@@ -322,6 +315,15 @@
 		}
 		.bs-topnav {
 			gap: 12px;
+		}
+	}
+	@media (max-width: 999px) and (min-width: 768px) {
+		.bs-pill-label {
+			display: none;
+		}
+		.bs-pill {
+			padding: 8px 10px;
+			gap: 0;
 		}
 	}
 

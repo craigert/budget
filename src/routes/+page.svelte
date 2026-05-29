@@ -319,7 +319,7 @@
 			{/if}
 		</a>
 
-		<a href="{base}/transactions" class="d-card d-card-link" style="padding: 0;">
+		<a href="{base}/transactions" class="d-card d-card-link" style="padding: 0 0 12px;">
 			<div class="d-card-head" style="padding: 22px 22px 12px; margin-bottom: 0;">
 				<h3 class="d-italic d-card-title">Recent activity</h3>
 				<span class="d-link">All →</span>
