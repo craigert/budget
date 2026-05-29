@@ -10,6 +10,7 @@
 	 * On mobile we fall through to a tight collapsed header (logo + Add + dark
 	 * toggle) and let the existing bottom Nav.svelte handle tab switching.
 	 */
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { base } from '$app/paths';
 	import { theme } from '$lib/theme.svelte';
@@ -17,6 +18,44 @@
 	import SearchOverlay from './SearchOverlay.svelte';
 
 	let showSearch = $state(false);
+
+	/* Scroll-driven nav behavior:
+	   - ≥768px (tablet + desktop): shrink padding/wordmark after 40px
+	   - <768px (mobile): hide on scroll down past 80px, show on scroll up
+	   The mobile hide uses a 6px direction threshold so a one-pixel
+	   jitter during touch inertia doesn't flap the nav. */
+	let scrolled = $state(false);
+	let hiddenNav = $state(false);
+	let lastY = 0;
+
+	function onScroll() {
+		const y = window.scrollY;
+		scrolled = y > 40;
+		if (y < 4) {
+			hiddenNav = false;
+		} else if (y > 80 && y - lastY > 6) {
+			hiddenNav = true;
+		} else if (lastY - y > 6) {
+			hiddenNav = false;
+		}
+		lastY = y;
+	}
+
+	onMount(() => {
+		lastY = window.scrollY;
+		window.addEventListener('scroll', onScroll, { passive: true });
+		return () => window.removeEventListener('scroll', onScroll);
+	});
+
+	/* Reset hide/shrink whenever the route changes so the nav is always
+	   fully present on the new page (it would feel broken to land on a tab
+	   with a half-hidden nav inherited from the previous scroll position). */
+	$effect(() => {
+		page.url.pathname;
+		hiddenNav = false;
+		scrolled = false;
+		lastY = 0;
+	});
 
 	const items = [
 		{ href: '/', label: 'Home', icon: 'home' },
@@ -48,7 +87,7 @@
 
 <svelte:window onkeydown={onkeydown} />
 
-<header class="bs-topnav">
+<header class="bs-topnav" class:scrolled class:hidden-nav={hiddenNav}>
 	<a href={`${base}/`} class="bs-topnav-brand" aria-label="Budget Sparrow home">
 		<img src={`${base}/logo.png`} alt="" width="30" height="30" class="bs-topnav-logo" />
 		<span class="bs-topnav-wordmark">
@@ -146,6 +185,40 @@
 		backdrop-filter: blur(20px) saturate(160%);
 		-webkit-backdrop-filter: blur(20px) saturate(160%);
 		border-bottom: 1px solid var(--bs-border);
+		transition:
+			padding 220ms cubic-bezier(0.3, 0.8, 0.3, 1),
+			transform 260ms cubic-bezier(0.3, 0.8, 0.3, 1);
+	}
+
+	/* Desktop + tablet shrink: tighter padding, smaller wordmark + logo so
+	   the nav reclaims ~16px of vertical space once you start scrolling. */
+	@media (min-width: 768px) {
+		.bs-topnav.scrolled {
+			padding-top: 8px;
+			padding-bottom: 8px;
+		}
+		.bs-topnav.scrolled .bs-topnav-logo {
+			width: 24px;
+			height: 24px;
+		}
+		.bs-topnav.scrolled .bs-topnav-wordmark {
+			font-size: 15px;
+		}
+	}
+
+	/* Mobile only: slide the whole bar up off-screen on scroll-down past
+	   80px; restore on scroll-up. The bottom Nav.svelte tab bar still
+	   provides navigation while the top is hidden. */
+	@media (max-width: 767px) {
+		.bs-topnav.hidden-nav {
+			transform: translateY(-100%);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.bs-topnav {
+			transition: none;
+		}
 	}
 
 	.bs-topnav-brand {
@@ -159,12 +232,14 @@
 		object-fit: contain;
 		display: block;
 		flex-shrink: 0;
+		transition: width 220ms cubic-bezier(0.3, 0.8, 0.3, 1), height 220ms cubic-bezier(0.3, 0.8, 0.3, 1);
 	}
 	.bs-topnav-wordmark {
 		font-size: 16px;
 		font-weight: 500;
 		color: var(--bs-text);
 		letter-spacing: -0.005em;
+		transition: font-size 220ms cubic-bezier(0.3, 0.8, 0.3, 1);
 	}
 	.bs-topnav-wordmark-accent {
 		font-family: var(--bs-font-serif);
