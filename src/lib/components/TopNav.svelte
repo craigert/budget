@@ -260,6 +260,14 @@
 		font-weight: 600;
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 	}
+	/* Dark mode: surface vs bg-2 are too close (~#19221A vs #141D15) for
+	   the active pill to read against the container. Switch to a brand-
+	   tinted lift with a brighter green text/icon and a deeper shadow. */
+	:global(.dark) .bs-pill.active {
+		background: color-mix(in oklch, var(--bs-brand) 24%, var(--bs-bg-2));
+		color: var(--bs-brand-3);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+	}
 
 	.bs-topnav-spacer {
 		flex: 1;
