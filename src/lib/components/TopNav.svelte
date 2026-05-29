@@ -321,6 +321,7 @@
 		}
 		.bs-topnav-search {
 			width: 38px;
+			height: 38px;
 			padding: 0;
 			justify-content: center;
 			color: var(--bs-text-2);
