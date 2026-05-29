@@ -9,8 +9,6 @@
 	import type { Account, Category, Transaction, Budget } from '$lib/db/types';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Button from '$lib/components/Button.svelte';
-	import { tweaks } from '$lib/uiState.svelte';
-	import { PALETTES, TYPOGRAPHY } from '$lib/theme.svelte';
 	import { installPrompt } from '$lib/installPrompt.svelte';
 
 	let installStatus = $state<string | null>(null);
@@ -177,35 +175,9 @@
 	{/if}
 
 	<section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-		<div class="mb-3 flex flex-wrap items-start justify-between gap-3">
-			<div>
-				<h2 class="text-lg font-semibold">Appearance</h2>
-				<p class="mt-1 text-sm" style="color: var(--bs-text-2);">
-					Palette, typography, density, radius — open the Tweaks panel to preview each one live.
-				</p>
-			</div>
-			<Button onclick={() => tweaks.show()}>Open Tweaks</Button>
-		</div>
-		<dl class="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-			<div>
-				<dt style="color: var(--bs-text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Mode</dt>
-				<dd class="mt-0.5 font-medium capitalize">{theme.value}</dd>
-			</div>
-			<div>
-				<dt style="color: var(--bs-text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Palette</dt>
-				<dd class="mt-0.5 font-medium">{PALETTES[theme.palette].label}</dd>
-			</div>
-			<div>
-				<dt style="color: var(--bs-text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Typography</dt>
-				<dd class="mt-0.5 font-medium">{TYPOGRAPHY[theme.typography].label}</dd>
-			</div>
-			<div>
-				<dt style="color: var(--bs-text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Density</dt>
-				<dd class="mt-0.5 font-medium capitalize">{theme.density}</dd>
-			</div>
-		</dl>
-		<div class="mt-4 flex flex-wrap items-center gap-2">
-			<span class="text-sm" style="color: var(--bs-text-2);">Quick mode:</span>
+		<h2 class="mb-4 text-lg font-semibold">Appearance</h2>
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="text-sm" style="color: var(--bs-text-2);">Theme:</span>
 			{#each ['light', 'dark', 'system'] as const as t (t)}
 				<button
 					class="rounded-md border px-3 py-1.5 text-sm capitalize {theme.value === t

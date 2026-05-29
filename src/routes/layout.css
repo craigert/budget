@@ -93,12 +93,6 @@
 html,
 body {
 	height: 100%;
-	/* Prevent the off-screen TweaksPanel drawer (translateX 100%) from
-	   creating horizontal scroll on narrow viewports — the panel is 360px
-	   wide and lands at viewport_width..viewport_width+360 when closed,
-	   which the browser would otherwise expose as a 1–2px right-edge
-	   shadow plus a phantom scrollbar. */
-	overflow-x: hidden;
 }
 
 body {

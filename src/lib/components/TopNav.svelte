@@ -15,7 +15,6 @@
 	import { theme } from '$lib/theme.svelte';
 	import Icon from './Icon.svelte';
 	import SearchOverlay from './SearchOverlay.svelte';
-	import { tweaks } from '$lib/uiState.svelte';
 
 	let showSearch = $state(false);
 
@@ -123,15 +122,6 @@
 			{:else}
 				<Icon name="weather/moon" size={17} />
 			{/if}
-		</button>
-		<button
-			type="button"
-			class="bs-topnav-icon"
-			onclick={() => tweaks.show()}
-			aria-label="Theme tweaks"
-			title="Theme &amp; layout"
-		>
-			<Icon name="general/settings-04" size={17} />
 		</button>
 		<a href={`${base}/transactions`} class="bs-topnav-add">
 			<Icon name="general/plus" size={16} />
@@ -300,15 +290,15 @@
 		text-decoration: none;
 	}
 
-	/* ── Tablet / medium-screen layout (768 → 1280) ───────────────────
+	/* ── Tablet / medium-screen layout (768 → 1100) ───────────────────
 	   At these widths the full "icon + label" pill nav and 200px search
 	   input overflow the bar. Drop pill labels (icons-only) and collapse
-	   the search into a small round icon-button matching the dark/gear/
-	   avatar circles. Pill nav stays visible so users can still navigate
-	   from the top — Tailwind's md: breakpoint hides the bottom nav at
-	   ≥768px, so the top nav has to take over from there.
-	   At ≥1280px the full layout returns. */
-	@media (max-width: 1280px) and (min-width: 768px) {
+	   the search into a small round icon-button matching the dark/avatar
+	   circles. Pill nav stays visible so users can still navigate from
+	   the top — Tailwind's md: breakpoint hides the bottom nav at
+	   ≥768px, so the top nav takes over from there.
+	   At ≥1100px the full label layout returns. */
+	@media (max-width: 1099px) and (min-width: 768px) {
 		.bs-pill-label {
 			display: none;
 		}
@@ -356,8 +346,8 @@
 		}
 	}
 
-	/* On phones, drop the gear (Tweaks is also in Settings) and tighten the
-	   brand wordmark so the row never overflows. */
+	/* Tighten the brand wordmark + Add CTA on small phones so the row
+	   doesn't overflow at 320 px. */
 	@media (max-width: 480px) {
 		.bs-topnav {
 			padding: 10px 14px;
@@ -365,9 +355,6 @@
 		}
 		.bs-topnav-right {
 			gap: 6px;
-		}
-		.bs-topnav-icon:nth-last-of-type(1) {
-			display: none; /* hide tweaks gear; available via Settings */
 		}
 		.bs-topnav-add {
 			padding: 8px 12px;

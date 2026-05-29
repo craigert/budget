@@ -6,10 +6,8 @@
 	import { theme } from '$lib/theme.svelte';
 	import TopNav from '$lib/components/TopNav.svelte';
 	import Nav from '$lib/components/Nav.svelte';
-	import TweaksPanel from '$lib/components/TweaksPanel.svelte';
 	import PwaUpdateToast from '$lib/components/PwaUpdateToast.svelte';
 	import IosInstallHint from '$lib/components/IosInstallHint.svelte';
-	import { tweaks } from '$lib/uiState.svelte';
 
 	let { children } = $props();
 	let ready = $state(false);
@@ -18,14 +16,6 @@
 		await bootstrap();
 		await theme.init();
 		ready = true;
-	});
-
-	// Safety net: close the Tweaks drawer whenever the route changes so it
-	// can never appear "auto-opened" on a page the user just navigated to.
-	$effect(() => {
-		// track pathname so the effect re-runs on every navigation
-		page.url.pathname;
-		tweaks.hide();
 	});
 </script>
 
@@ -52,10 +42,6 @@
 	<Nav />
 </div>
 
-<!-- TweaksPanel lives at the layout root, above .bs-tab-content's animation
-     transform so its position:fixed actually resolves to the viewport. -->
-<TweaksPanel open={tweaks.open} onclose={() => tweaks.hide()} />
-
 <PwaUpdateToast />
 <IosInstallHint />
 
@@ -64,7 +50,6 @@
 		max-width: 1240px;
 		margin: 0 auto;
 		padding: 28px 40px 56px;
-		min-height: calc(100vh - 64px);
 	}
 	@media (max-width: 920px) {
 		.bs-main {
