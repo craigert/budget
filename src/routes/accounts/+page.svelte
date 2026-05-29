@@ -113,18 +113,7 @@
 	}
 </script>
 
-<ScreenTitle title="Accounts" eyebrow="{visible.length} account{visible.length === 1 ? '' : 's'} linked">
-	{#snippet actions()}
-		<a
-			href="{base}/transactions"
-			class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
-			style="background: var(--bs-text); color: var(--bs-bg);"
-		>
-			<Icon name="general/plus" size={14} />
-			Add transaction
-		</a>
-	{/snippet}
-</ScreenTitle>
+<ScreenTitle title="Accounts" eyebrow="{visible.length} account{visible.length === 1 ? '' : 's'} linked" />
 
 {#if visible.length === 0}
 		<div class="rounded-xl p-10 text-center" style="border: 1px dashed var(--bs-border-2); background: var(--bs-surface);">
