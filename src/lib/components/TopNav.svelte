@@ -19,18 +19,20 @@
 
 	let showSearch = $state(false);
 
-	/* Scroll-driven nav behavior:
-	   - ≥768px (tablet + desktop): shrink padding/wordmark after 40px
-	   - <768px (mobile): hide on scroll down past 80px, show on scroll up
-	   The mobile hide uses a 6px direction threshold so a one-pixel
-	   jitter during touch inertia doesn't flap the nav. */
-	let scrolled = $state(false);
+	/* Mobile-only scroll behavior: hide on scroll-down past 80px, show on
+	   scroll-up. 6px direction threshold avoids touch-inertia jitter; auto-
+	   reveal within 4px of the top so the user can always pull to the top
+	   to reach search/add/avatar. Desktop + tablet just stay sticky.
+	   A media-query check in JS keeps the listener no-op above 768px. */
 	let hiddenNav = $state(false);
 	let lastY = 0;
 
 	function onScroll() {
+		if (window.innerWidth >= 768) {
+			if (hiddenNav) hiddenNav = false;
+			return;
+		}
 		const y = window.scrollY;
-		scrolled = y > 40;
 		if (y < 4) {
 			hiddenNav = false;
 		} else if (y > 80 && y - lastY > 6) {
@@ -47,13 +49,11 @@
 		return () => window.removeEventListener('scroll', onScroll);
 	});
 
-	/* Reset hide/shrink whenever the route changes so the nav is always
-	   fully present on the new page (it would feel broken to land on a tab
-	   with a half-hidden nav inherited from the previous scroll position). */
+	/* Reset hide state on route change so a new tab always opens with the
+	   full nav visible. */
 	$effect(() => {
 		page.url.pathname;
 		hiddenNav = false;
-		scrolled = false;
 		lastY = 0;
 	});
 
@@ -87,7 +87,7 @@
 
 <svelte:window onkeydown={onkeydown} />
 
-<header class="bs-topnav" class:scrolled class:hidden-nav={hiddenNav}>
+<header class="bs-topnav" class:hidden-nav={hiddenNav}>
 	<a href={`${base}/`} class="bs-topnav-brand" aria-label="Budget Sparrow home">
 		<img src={`${base}/logo.png`} alt="" width="30" height="30" class="bs-topnav-logo" />
 		<span class="bs-topnav-wordmark">
@@ -185,25 +185,7 @@
 		backdrop-filter: blur(20px) saturate(160%);
 		-webkit-backdrop-filter: blur(20px) saturate(160%);
 		border-bottom: 1px solid var(--bs-border);
-		transition:
-			padding 220ms cubic-bezier(0.3, 0.8, 0.3, 1),
-			transform 260ms cubic-bezier(0.3, 0.8, 0.3, 1);
-	}
-
-	/* Desktop + tablet shrink: tighter padding, smaller wordmark + logo so
-	   the nav reclaims ~16px of vertical space once you start scrolling. */
-	@media (min-width: 768px) {
-		.bs-topnav.scrolled {
-			padding-top: 8px;
-			padding-bottom: 8px;
-		}
-		.bs-topnav.scrolled .bs-topnav-logo {
-			width: 24px;
-			height: 24px;
-		}
-		.bs-topnav.scrolled .bs-topnav-wordmark {
-			font-size: 15px;
-		}
+		transition: transform 260ms cubic-bezier(0.3, 0.8, 0.3, 1);
 	}
 
 	/* Mobile only: slide the whole bar up off-screen on scroll-down past
@@ -232,14 +214,12 @@
 		object-fit: contain;
 		display: block;
 		flex-shrink: 0;
-		transition: width 220ms cubic-bezier(0.3, 0.8, 0.3, 1), height 220ms cubic-bezier(0.3, 0.8, 0.3, 1);
 	}
 	.bs-topnav-wordmark {
 		font-size: 16px;
 		font-weight: 500;
 		color: var(--bs-text);
 		letter-spacing: -0.005em;
-		transition: font-size 220ms cubic-bezier(0.3, 0.8, 0.3, 1);
 	}
 	.bs-topnav-wordmark-accent {
 		font-family: var(--bs-font-serif);
