@@ -665,7 +665,7 @@
 <ScreenTitle title="Taxes" eyebrow="Tax year {year} · for FreeTaxUSA">
 	{#snippet actions()}
 		<select
-			class="text-sm"
+			class="bs-select-pill"
 			value={year}
 			onchange={(e) => (year = Number((e.currentTarget as HTMLSelectElement).value))}
 			aria-label="Tax year"
