@@ -4,7 +4,7 @@
 	import { accountBalances } from '$lib/db/queries';
 	import { ACCOUNT_TYPES, type Account, type AccountType, type Business } from '$lib/db/types';
 	import { money } from '$lib/utils/format';
-	import PageHeader from '$lib/components/PageHeader.svelte';
+	import ScreenTitle from '$lib/components/ScreenTitle.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -113,7 +113,7 @@
 	}
 </script>
 
-<PageHeader title="Accounts" eyebrow="NET WORTH VIEW">
+<ScreenTitle title="Accounts" eyebrow="{visible.length} account{visible.length === 1 ? '' : 's'} linked">
 	{#snippet actions()}
 		<a
 			href="{base}/transactions"
@@ -124,7 +124,7 @@
 			Add transaction
 		</a>
 	{/snippet}
-</PageHeader>
+</ScreenTitle>
 
 <div class="space-y-6 p-4 md:p-8">
 	{#if visible.length === 0}

@@ -11,7 +11,7 @@
 	} from '$lib/db/types';
 	import { mileageRate } from '$lib/db/types';
 	import { money, formatDate } from '$lib/utils/format';
-	import PageHeader from '$lib/components/PageHeader.svelte';
+	import ScreenTitle from '$lib/components/ScreenTitle.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { clearOnFocus } from '$lib/actions/clearOnFocus';
@@ -662,7 +662,7 @@
 	}
 </script>
 
-<PageHeader title="Taxes" subtitle="Year-end summary for FreeTaxUSA — {year}">
+<ScreenTitle title="Taxes" eyebrow="Tax year {year} · for FreeTaxUSA">
 	{#snippet actions()}
 		<select
 			class="text-sm"
@@ -675,7 +675,7 @@
 			{/each}
 		</select>
 	{/snippet}
-</PageHeader>
+</ScreenTitle>
 
 <div class="space-y-6 p-4 md:p-8">
 	<!-- Ready-to-file accordion (document checklist + refund estimator) -->
