@@ -120,13 +120,26 @@
 		measure();
 		resizeObs = new ResizeObserver(measure);
 		if (wrapEl) resizeObs.observe(wrapEl);
+	});
 
-		// Two requestAnimationFrames so the path is rendered before we measure
-		// its length (otherwise getTotalLength returns 0).
+	/* Re-measure the path's total length whenever the path's `d` actually
+	   changes — this is critical because the data loads asynchronously from
+	   Dexie AFTER mount, and the range chips can shorten/lengthen the path
+	   later. If we measured only once on mount the dash-array would be stale
+	   and the new path would render with its tail clipped off (the user-
+	   visible "trendline doesn't connect to the endpoint dot" bug). */
+	$effect(() => {
+		linePath; // re-track when path changes
+		W; // re-track when container resizes
+		if (!pathEl) return;
+		// Two rAFs so the DOM has actually painted the new d before we ask
+		// for getTotalLength; otherwise it returns 0 on the first paint.
 		requestAnimationFrame(() => {
 			requestAnimationFrame(() => {
-				if (pathEl) len = pathEl.getTotalLength();
-				drawn = true;
+				if (pathEl) {
+					len = pathEl.getTotalLength();
+					drawn = true;
+				}
 			});
 		});
 	});

@@ -60,7 +60,34 @@
 	const allAccounts = live<Account[]>(() => db.accounts.toArray(), []);
 	const allTxs = live<Transaction[]>(() => db.transactions.toArray(), []);
 
-	const networthPoints = $derived(rollingMonthlySeries(allAccounts.value, allTxs.value, 12));
+	type Range = '1M' | '3M' | 'YTD' | '1Y';
+	let nwRange = $state<Range>('YTD');
+
+	const networthSeries = $derived(rollingMonthlySeries(allAccounts.value, allTxs.value, 12));
+	const networthPoints = $derived.by(() => {
+		if (networthSeries.length === 0) return networthSeries;
+		const last = networthSeries[networthSeries.length - 1].date;
+		const [ly, lm, ld] = last.split('-').map(Number);
+		const lastDate = new Date(Date.UTC(ly, lm - 1, ld));
+		const cutoff = new Date(lastDate);
+		switch (nwRange) {
+			case '1M':
+				cutoff.setUTCMonth(cutoff.getUTCMonth() - 1);
+				break;
+			case '3M':
+				cutoff.setUTCMonth(cutoff.getUTCMonth() - 3);
+				break;
+			case 'YTD':
+				cutoff.setUTCMonth(0, 1);
+				break;
+			case '1Y':
+				return networthSeries;
+		}
+		const cutIso = cutoff.toISOString().slice(0, 10);
+		const filtered = networthSeries.filter((p) => p.date >= cutIso);
+		// Always keep at least 2 points so there's a line to draw.
+		return filtered.length >= 2 ? filtered : networthSeries.slice(-2);
+	});
 	const catMap = $derived(new Map(categories.value.map((c) => [c.id!, c])));
 
 	const savedThisMonth = $derived(inc.value - exp.value);
@@ -140,8 +167,6 @@
 		return `You're tracking <em style="color: var(--bs-neg); font-weight: 500;">${money0(Math.abs(projected))} short</em> this month — time to revisit the budget.`;
 	});
 
-	type Range = '1M' | '3M' | 'YTD' | '1Y';
-	let nwRange = $state<Range>('YTD');
 	let scrubLabel = $state<string | null>(null);
 
 	function handleScrub(p: import('$lib/utils/netWorthSeries').NetWorthPoint | null) {
