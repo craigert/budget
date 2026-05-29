@@ -830,7 +830,7 @@
 		gap: 12px;
 	}
 	.bs-tx-row:hover {
-		background: var(--bs-surface-2);
+		background: color-mix(in oklch, var(--bs-text) 3%, var(--bs-surface));
 	}
 	.bs-tx-row:active {
 		transform: scale(0.997);
