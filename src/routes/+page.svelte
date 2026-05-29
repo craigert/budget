@@ -295,7 +295,7 @@
 				{/if}
 			</div>
 			<div class="d-card d-card-accent" style="flex: 1;">
-				<div class="d-card-eyebrow" style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">Health score</div>
+				<div class="d-card-eyebrow" style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">Financial Health</div>
 				<div class="d-italic d-card-display" style="color: #fff;">
 					{healthScore}<span class="d-card-display-sub" style="opacity: 0.7;"> / 100</span>
 				</div>
@@ -400,6 +400,13 @@
 		background: var(--bs-accent);
 		color: #fff;
 		box-shadow: 0 8px 24px rgba(176, 120, 66, 0.26);
+	}
+	/* Dark mode: full-saturation brass on the forest bg is jarring. Tone it
+	   down by mixing the accent with the dark panel — keeps the warm
+	   "accent" cue while sitting comfortably against the page bg. */
+	:global(.dark) .d-card-accent {
+		background: color-mix(in oklch, var(--bs-accent) 30%, var(--bs-panel, #1a2118));
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
 	}
 	.d-card-link {
 		cursor: pointer;
