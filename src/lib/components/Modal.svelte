@@ -12,6 +12,20 @@
 	function onkeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onclose();
 	}
+
+	/* Only close when the click is genuinely on the backdrop. Without this,
+	   the click event that triggered openEdit can bubble in once the modal
+	   mounts synchronously and immediately fire onclose. Also using
+	   pointerdown→pointerup matching so a drag started inside the panel
+	   that ends on the backdrop doesn't dismiss it. */
+	let backdropPointerDown = false;
+	function onBackdropPointerDown(e: PointerEvent) {
+		backdropPointerDown = e.target === e.currentTarget;
+	}
+	function onBackdropClick(e: MouseEvent) {
+		if (backdropPointerDown && e.target === e.currentTarget) onclose();
+		backdropPointerDown = false;
+	}
 </script>
 
 <svelte:window onkeydown={open ? onkeydown : null} />
@@ -21,7 +35,8 @@
 		class="bs-modal-backdrop"
 		role="dialog"
 		aria-modal="true"
-		onclick={onclose}
+		onpointerdown={onBackdropPointerDown}
+		onclick={onBackdropClick}
 		onkeydown={(e) => e.key === 'Enter' && onclose()}
 		tabindex="-1"
 	>
