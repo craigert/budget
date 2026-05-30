@@ -10,59 +10,154 @@
 	let { open, title, onclose, children, footer }: Props = $props();
 
 	function onkeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onclose();
-	}
-
-	/* Backdrop close requires the press to have STARTED on the backdrop —
-	   so the click event that triggered openEdit doesn't immediately fire
-	   onclose when the modal mounts synchronously underneath the cursor. */
-	let backdropPointerDown = false;
-	function onBackdropPointerDown(e: PointerEvent) {
-		backdropPointerDown = e.target === e.currentTarget;
-	}
-	function onBackdropClick(e: MouseEvent) {
-		if (backdropPointerDown && e.target === e.currentTarget) onclose();
-		backdropPointerDown = false;
+		if (open && e.key === 'Escape') onclose();
 	}
 </script>
 
-<svelte:window onkeydown={open ? onkeydown : null} />
+<svelte:window onkeydown={onkeydown} />
 
-{#if open}
-	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-		role="dialog"
-		aria-modal="true"
-		onpointerdown={onBackdropPointerDown}
-		onclick={onBackdropClick}
-		onkeydown={(e) => e.key === 'Enter' && onclose()}
-		tabindex="-1"
-	>
-		<div
-			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900"
-			onclick={(e) => e.stopPropagation()}
-			role="document"
-			onkeydown={(e) => e.stopPropagation()}
-		>
-			<div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-				<h2 class="text-lg font-semibold">{title}</h2>
-				<button
-					type="button"
-					onclick={onclose}
-					class="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-					aria-label="Close"
-				>
-					✕
-				</button>
-			</div>
-			<div class="flex-1 overflow-y-auto px-5 py-4">
-				{@render children?.()}
-			</div>
-			{#if footer}
-				<div class="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-5 py-3 dark:border-slate-800">
-					{@render footer()}
-				</div>
-			{/if}
+<!--
+	The modal markup is always in the DOM and visibility-toggled via the
+	`.open` class. Mounting the form children up front means the open
+	path is just a class flip — no element creation, no form binding
+	setup, no Svelte transition runtime — so click → visible is the
+	fastest the browser can paint a single style change.
+
+	When closed: `visibility: hidden; pointer-events: none;` so the
+	overlay is unreachable to the cursor and skipped by accessibility
+	trees. The original click that opened it can't hit the backdrop
+	(pointer-events: none was still in effect at click time), so no
+	open-then-close flicker.
+-->
+<div
+	class="bs-modal-root"
+	class:open
+	role="dialog"
+	aria-modal={open}
+	aria-hidden={!open}
+>
+	<button
+		type="button"
+		class="bs-modal-backdrop"
+		aria-label="Close"
+		tabindex={open ? 0 : -1}
+		onclick={onclose}
+	></button>
+	<div class="bs-modal-panel" role="document">
+		<div class="bs-modal-header">
+			<h2 class="bs-modal-title">{title}</h2>
+			<button
+				type="button"
+				onclick={onclose}
+				class="bs-modal-close"
+				aria-label="Close"
+			>
+				✕
+			</button>
 		</div>
+		<div class="bs-modal-content">
+			{@render children?.()}
+		</div>
+		{#if footer}
+			<div class="bs-modal-footer">
+				{@render footer()}
+			</div>
+		{/if}
 	</div>
-{/if}
+</div>
+
+<style>
+	.bs-modal-root {
+		position: fixed;
+		inset: 0;
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		visibility: hidden;
+		pointer-events: none;
+	}
+	.bs-modal-root.open {
+		visibility: visible;
+		pointer-events: auto;
+	}
+
+	.bs-modal-backdrop {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		border: 0;
+		padding: 0;
+		margin: 0;
+		background: rgba(0, 0, 0, 0.5);
+		cursor: default;
+	}
+
+	.bs-modal-panel {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		max-width: 32rem;
+		max-height: 80dvh;
+		overflow: hidden;
+		border-radius: 1rem;
+		background: var(--bs-surface, #fff);
+		box-shadow:
+			0 10px 15px -3px rgba(0, 0, 0, 0.1),
+			0 4px 6px -4px rgba(0, 0, 0, 0.1);
+	}
+	:global(.dark) .bs-modal-panel {
+		background: var(--bs-panel, #1a2118);
+		color: var(--bs-panel-tx, #e8e0cc);
+	}
+
+	.bs-modal-header {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 20px;
+		border-bottom: 1px solid var(--bs-border);
+	}
+	.bs-modal-title {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 600;
+		color: var(--bs-text);
+	}
+	.bs-modal-close {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border: none;
+		background: transparent;
+		color: var(--bs-text-3);
+		border-radius: 6px;
+		cursor: pointer;
+	}
+	.bs-modal-close:hover {
+		background: color-mix(in oklch, var(--bs-text) 6%, transparent);
+		color: var(--bs-text);
+	}
+
+	.bs-modal-content {
+		flex: 1;
+		overflow-y: auto;
+		padding: 16px 20px;
+	}
+
+	.bs-modal-footer {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 12px 20px;
+		border-top: 1px solid var(--bs-border);
+	}
+</style>
