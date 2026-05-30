@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { fade, scale } from 'svelte/transition';
-	import { cubicOut } from 'svelte/easing';
-
 	interface Props {
 		open: boolean;
 		title: string;
@@ -16,11 +13,9 @@
 		if (e.key === 'Escape') onclose();
 	}
 
-	/* Belt-and-suspenders backdrop close: only fire onclose when the press
-	   actually started on the backdrop. Pure click-target matching is
-	   enough on desktop, but a touch tap that opened the modal can
-	   synthesize a click on whatever's now under the finger — which is
-	   the backdrop — and immediately dismiss without this check. */
+	/* Backdrop close requires the press to have STARTED on the backdrop —
+	   so the click event that triggered openEdit doesn't immediately fire
+	   onclose when the modal mounts synchronously underneath the cursor. */
 	let backdropPointerDown = false;
 	function onBackdropPointerDown(e: PointerEvent) {
 		backdropPointerDown = e.target === e.currentTarget;
@@ -42,15 +37,12 @@
 		onclick={onBackdropClick}
 		onkeydown={(e) => e.key === 'Enter' && onclose()}
 		tabindex="-1"
-		transition:fade={{ duration: 110 }}
 	>
 		<div
 			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900"
-			style="will-change: transform, opacity;"
 			onclick={(e) => e.stopPropagation()}
 			role="document"
 			onkeydown={(e) => e.stopPropagation()}
-			transition:scale={{ duration: 140, start: 0.97, easing: cubicOut }}
 		>
 			<div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
 				<h2 class="text-lg font-semibold">{title}</h2>
