@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { fade, scale } from 'svelte/transition';
-	import { cubicOut } from 'svelte/easing';
-
 	interface Props {
 		open: boolean;
 		title: string;
@@ -21,21 +18,18 @@
 
 {#if open}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		class="bs-modal-backdrop"
 		role="dialog"
 		aria-modal="true"
 		onclick={onclose}
 		onkeydown={(e) => e.key === 'Enter' && onclose()}
 		tabindex="-1"
-		transition:fade={{ duration: 110 }}
 	>
 		<div
-			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900"
-			style="will-change: transform, opacity;"
+			class="bs-modal-panel"
 			onclick={(e) => e.stopPropagation()}
 			role="document"
 			onkeydown={(e) => e.stopPropagation()}
-			transition:scale={{ duration: 140, start: 0.97, easing: cubicOut }}
 		>
 			<div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
 				<h2 class="text-lg font-semibold">{title}</h2>
@@ -59,3 +53,60 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	/* CSS keyframes (not Svelte transitions) so the animation kicks in the
+	   same paint frame the element mounts. Svelte's `transition:` directive
+	   adds a tick of overhead before it computes from/to styles — enough to
+	   feel like a delay between the click and the modal showing. */
+	@keyframes bs-modal-backdrop-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+	@keyframes bs-modal-panel-in {
+		from {
+			opacity: 0;
+			transform: scale(0.97);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+	.bs-modal-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		background: rgba(0, 0, 0, 0.5);
+		animation: bs-modal-backdrop-in 90ms ease-out;
+	}
+	.bs-modal-panel {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		max-width: 32rem;
+		max-height: 80dvh;
+		overflow: hidden;
+		border-radius: 1rem;
+		background: var(--bs-surface, #fff);
+		box-shadow:
+			0 10px 15px -3px rgba(0, 0, 0, 0.1),
+			0 4px 6px -4px rgba(0, 0, 0, 0.1);
+		animation: bs-modal-panel-in 120ms cubic-bezier(0.2, 0.8, 0.3, 1);
+		will-change: transform, opacity;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bs-modal-backdrop,
+		.bs-modal-panel {
+			animation: none;
+		}
+	}
+</style>
