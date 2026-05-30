@@ -12,6 +12,20 @@
 	function onkeydown(e: KeyboardEvent) {
 		if (open && e.key === 'Escape') onclose();
 	}
+
+	/* Lock body scroll when the modal is open so the page underneath can't
+	   scroll while the dialog is active. Stash the previous overflow value
+	   so navigation away (which destroys the modal) restores whatever was
+	   there before. */
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		if (!open) return;
+		const prev = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		return () => {
+			document.body.style.overflow = prev;
+		};
+	});
 </script>
 
 <svelte:window onkeydown={onkeydown} />
