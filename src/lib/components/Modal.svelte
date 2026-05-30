@@ -21,20 +21,21 @@
 
 {#if open}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		role="dialog"
 		aria-modal="true"
 		onclick={onclose}
 		onkeydown={(e) => e.key === 'Enter' && onclose()}
 		tabindex="-1"
-		transition:fade={{ duration: 140 }}
+		transition:fade={{ duration: 110 }}
 	>
 		<div
 			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900"
+			style="will-change: transform, opacity;"
 			onclick={(e) => e.stopPropagation()}
 			role="document"
 			onkeydown={(e) => e.stopPropagation()}
-			transition:scale={{ duration: 180, start: 0.96, easing: cubicOut }}
+			transition:scale={{ duration: 140, start: 0.97, easing: cubicOut }}
 		>
 			<div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
 				<h2 class="text-lg font-semibold">{title}</h2>
