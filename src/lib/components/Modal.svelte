@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
+
 	interface Props {
 		open: boolean;
 		title: string;
@@ -24,12 +27,14 @@
 		onclick={onclose}
 		onkeydown={(e) => e.key === 'Enter' && onclose()}
 		tabindex="-1"
+		transition:fade={{ duration: 140 }}
 	>
 		<div
 			class="flex max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900"
 			onclick={(e) => e.stopPropagation()}
 			role="document"
 			onkeydown={(e) => e.stopPropagation()}
+			transition:scale={{ duration: 180, start: 0.96, easing: cubicOut }}
 		>
 			<div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
 				<h2 class="text-lg font-semibold">{title}</h2>
